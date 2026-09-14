@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-find_package(OpenCASCADE REQUIRED COMPONENTS TKernel TKMath TKBRep TKPrim TKTopAlgo TKShHealing)
+find_package(OpenCASCADE REQUIRED)
 
 add_library(umlcad_occt_bridge SHARED
     cpp/bridge.cpp
