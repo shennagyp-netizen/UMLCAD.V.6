@@ -24,9 +24,17 @@ jobs:
             build-essential \
             cmake \
             pkg-config \
+            libtbb-dev \
             libocct-foundation-dev \
             libocct-modeling-data-dev \
-            libocct-modeling-algorithms-dev
+            libocct-modeling-algorithms-dev \
+            libocct-visualization-dev
+
+      - name: Verify OCCT development files
+        run: |
+          test -f /usr/include/opencascade/NCollection_AliasedArray.hxx
+          test -e /usr/lib/x86_64-linux-gnu/libtbb.so
+          dpkg-query -W libocct-foundation-dev libocct-visualization-dev libtbb-dev
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
