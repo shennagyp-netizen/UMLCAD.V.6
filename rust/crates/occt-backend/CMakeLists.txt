@@ -10,6 +10,7 @@ find_package(OpenCASCADE REQUIRED)
 add_library(umlcad_occt_bridge SHARED
     cpp/bridge.cpp
     cpp/cone.cpp
+    cpp/boolean.cpp
 )
 
 target_include_directories(umlcad_occt_bridge
@@ -24,6 +25,7 @@ target_link_directories(umlcad_occt_bridge
 
 target_link_libraries(umlcad_occt_bridge
     PRIVATE
+        TKBool
         TKPrim
         TKTopAlgo
         TKBRep
