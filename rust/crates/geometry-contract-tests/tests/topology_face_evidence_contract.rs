@@ -13,6 +13,7 @@ fn sorted_descriptors(mut values: Vec<FaceDescriptor>) -> Vec<FaceDescriptor> {
             .then_with(|| a.bounds.max_x.total_cmp(&b.bounds.max_x))
             .then_with(|| a.bounds.max_y.total_cmp(&b.bounds.max_y))
             .then_with(|| a.bounds.max_z.total_cmp(&b.bounds.max_z))
+            .then_with(|| a.boundary_edge_count.cmp(&b.boundary_edge_count))
     });
     values
 }
@@ -31,6 +32,7 @@ fn box_face_evidence_has_six_deterministic_planar_faces() {
     for descriptor in &descriptors {
         assert!(descriptor.area.is_finite());
         assert!((descriptor.area - 400.0).abs() <= 1e-9);
+        assert_eq!(descriptor.boundary_edge_count, 4);
         assert!(descriptor.bounds.validate().is_ok());
     }
 
