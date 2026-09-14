@@ -1,5 +1,5 @@
 use std::ptr::NonNull;
-use umlcad_v6_geometry_api::{BoundingBox,GeometryBackend,GeometryError,GeometryEvidence,GeometryKind,GeometryResult,GeometryStatus,ToleranceContext,TopologyCounts,ValidationResult};
+use umlcad_v6_geometry_api::{BoundingBox,FaceDescriptor,GeometryBackend,GeometryError,GeometryEvidence,GeometryKind,GeometryResult,GeometryStatus,ToleranceContext,TopologyCounts,ValidationResult};
 #[repr(C)] struct NativeShape{_private:[u8;0]}
 unsafe extern "C"{
  fn umlcad_occt_box(width:f64,depth:f64,height:f64,out_shape:*mut *mut NativeShape)->i32;
@@ -19,6 +19,8 @@ unsafe extern "C"{
  fn umlcad_occt_shape_rotate(input:*const NativeShape,axis_x:f64,axis_y:f64,axis_z:f64,angle_radians:f64,out_shape:*mut *mut NativeShape)->i32;
  fn umlcad_occt_shape_bounding_box(input:*const NativeShape,out_bounds:*mut f64)->i32;
  fn umlcad_occt_shape_topology_counts(input:*const NativeShape,out_counts:*mut u32)->i32;
+ fn umlcad_occt_shape_face_descriptor_count(input:*const NativeShape,out_count:*mut u32)->i32;
+ fn umlcad_occt_shape_face_descriptors(input:*const NativeShape,out_values:*mut f64,capacity:u32)->i32;
  fn umlcad_occt_shape_validate(input:*const NativeShape,valid:*mut i32,manifold:*mut i32)->i32;
  fn umlcad_occt_shape_delete(shape:*mut NativeShape);
 }
@@ -64,6 +66,7 @@ impl GeometryBackend for OcctBackend{
  fn rotate(&self,s:&Self::Shape,ax:f64,ay:f64,az:f64,a:f64,t:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>{t.validate()?;Self::rotation(ax,ay,az,a)?;let mut o=std::ptr::null_mut();let st=unsafe{umlcad_occt_shape_rotate(s.raw.as_ptr(),ax,ay,az,a,&mut o)};if st!=OCCT_OK{return Err(Self::status(st,"OCCT rotation failed"))}let raw=NonNull::new(o).ok_or(GeometryError::Unsupported("OCCT returned null"))?;Ok(GeometryResult{shape:OcctShape{raw},kind:GeometryKind::Solid,evidence:self.evidence(GeometryStatus::Success,t)})}
  fn bounding_box(&self,s:&Self::Shape,t:ToleranceContext)->Result<BoundingBox,GeometryError>{t.validate()?;let mut v=[0.;6];let st=unsafe{umlcad_occt_shape_bounding_box(s.raw.as_ptr(),v.as_mut_ptr())};if st!=OCCT_OK{return Err(Self::status(st,"OCCT bounding-box measurement failed"))}let b=BoundingBox{min_x:v[0],min_y:v[1],min_z:v[2],max_x:v[3],max_y:v[4],max_z:v[5]};b.validate()?;Ok(b)}
  fn topology_counts(&self,s:&Self::Shape,t:ToleranceContext)->Result<TopologyCounts,GeometryError>{t.validate()?;let mut v=[0;5];let st=unsafe{umlcad_occt_shape_topology_counts(s.raw.as_ptr(),v.as_mut_ptr())};if st!=OCCT_OK{return Err(Self::status(st,"OCCT topology-count measurement failed"))}Ok(TopologyCounts{solids:v[0],shells:v[1],faces:v[2],edges:v[3],vertices:v[4]})}
+ fn face_descriptors(&self,s:&Self::Shape,t:ToleranceContext)->Result<Vec<FaceDescriptor>,GeometryError>{t.validate()?;let mut count=0u32;let st=unsafe{umlcad_occt_shape_face_descriptor_count(s.raw.as_ptr(),&mut count)};if st!=OCCT_OK{return Err(Self::status(st,"OCCT face descriptor count failed"))}if count==0{return Ok(Vec::new())}let mut values=vec![0.0f64;count as usize*7];let st=unsafe{umlcad_occt_shape_face_descriptors(s.raw.as_ptr(),values.as_mut_ptr(),count)};if st!=OCCT_OK{return Err(Self::status(st,"OCCT face descriptor extraction failed"))}let mut descriptors=Vec::with_capacity(count as usize);for chunk in values.chunks_exact(7){let d=FaceDescriptor{area:chunk[0],bounds:BoundingBox{min_x:chunk[1],min_y:chunk[2],min_z:chunk[3],max_x:chunk[4],max_y:chunk[5],max_z:chunk[6]}};d.validate()?;descriptors.push(d)}Ok(descriptors)}
  fn validate(&self,s:&Self::Shape,t:ToleranceContext)->Result<ValidationResult,GeometryError>{t.validate()?;let(mut valid,mut manifold)=(0,0);let st=unsafe{umlcad_occt_shape_validate(s.raw.as_ptr(),&mut valid,&mut manifold)};if st!=OCCT_OK{return Err(Self::status(st,"OCCT validation failed"))}let valid_bool=valid!=0;let mut manifold_bool=manifold!=0;if valid_bool&&!manifold_bool{let c=self.topology_counts(s,t)?;manifold_bool=c.solids==1&&c.shells==1&&c.faces>=1&&c.edges>=1&&c.vertices>=1}Ok(ValidationResult{valid:valid_bool,manifold:manifold_bool,message:None})}
 }
 impl OcctBackend{fn boolean(&self,l:&OcctShape,r:&OcctShape,t:ToleranceContext,op:unsafe extern "C" fn(*const NativeShape,*const NativeShape,*mut*mut NativeShape)->i32)->Result<GeometryResult<OcctShape>,GeometryError>{t.validate()?;let mut o=std::ptr::null_mut();let st=unsafe{op(l.raw.as_ptr(),r.raw.as_ptr(),&mut o)};if st!=OCCT_OK{return Err(Self::status(st,"OCCT Boolean operation failed"))}let raw=NonNull::new(o).ok_or(GeometryError::Unsupported("OCCT returned null"))?;Ok(GeometryResult{shape:OcctShape{raw},kind:GeometryKind::Solid,evidence:self.evidence(GeometryStatus::Success,t)})}}
