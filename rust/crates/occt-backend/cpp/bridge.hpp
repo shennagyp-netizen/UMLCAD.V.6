@@ -22,6 +22,10 @@ int32_t umlcad_occt_cylinder(double radius, double height, umlcad_occt_shape** o
 int32_t umlcad_occt_sphere(double radius, umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_cone(double base_radius, double top_radius, double height, umlcad_occt_shape** out_shape);
 
+int32_t umlcad_occt_fuse(const umlcad_occt_shape* left, const umlcad_occt_shape* right, umlcad_occt_shape** out_shape);
+int32_t umlcad_occt_common(const umlcad_occt_shape* left, const umlcad_occt_shape* right, umlcad_occt_shape** out_shape);
+int32_t umlcad_occt_cut(const umlcad_occt_shape* left, const umlcad_occt_shape* right, umlcad_occt_shape** out_shape);
+
 int32_t umlcad_occt_shape_clone(const umlcad_occt_shape* input, umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_shape_translate(const umlcad_occt_shape* input, double dx, double dy, double dz, umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_shape_rotate(const umlcad_occt_shape* input, double axis_x, double axis_y, double axis_z, double angle_radians, umlcad_occt_shape** out_shape);
