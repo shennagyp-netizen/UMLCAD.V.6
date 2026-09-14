@@ -4,9 +4,11 @@
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepGProp.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
 #include <BRepPrimAPI_MakeSphere.hxx>
+#include <GProp_GProps.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
@@ -23,9 +25,7 @@
 #include <cmath>
 #include <new>
 
-struct umlcad_occt_shape {
-    TopoDS_Shape value;
-};
+struct umlcad_occt_shape { TopoDS_Shape value; };
 
 namespace {
 
@@ -56,8 +56,6 @@ bool solidBoundaryIsEdgeManifold(const TopoDS_Shape& shape) {
         return false;
     }
 
-    // Count face uses rather than distinct incident faces. A periodic face can use
-    // the same seam edge twice while remaining a closed two-sided boundary.
     TopTools_IndexedDataMapOfShapeListOfShape edge_to_face_uses;
     for (TopExp_Explorer face_explorer(shape, TopAbs_FACE); face_explorer.More(); face_explorer.Next()) {
         const TopoDS_Shape& face = face_explorer.Current();
@@ -76,6 +74,38 @@ bool solidBoundaryIsEdgeManifold(const TopoDS_Shape& shape) {
         }
     }
 
+    return true;
+}
+
+bool faceDescriptor(const TopoDS_Shape& face, double* values) {
+    if (values == nullptr || face.IsNull() || face.ShapeType() != TopAbs_FACE) {
+        return false;
+    }
+
+    GProp_GProps properties;
+    BRepGProp::SurfaceProperties(face, properties);
+    const double area = properties.Mass();
+    if (!isFiniteValue(area) || area < 0.0) {
+        return false;
+    }
+
+    Bnd_Box bounds;
+    bounds.SetGap(0.0);
+    BRepBndLib::AddOptimal(face, bounds, Standard_False, Standard_False);
+    if (bounds.IsVoid()) {
+        return false;
+    }
+
+    double min_x, min_y, min_z, max_x, max_y, max_z;
+    bounds.Get(min_x, min_y, min_z, max_x, max_y, max_z);
+    if (!isFiniteValue(min_x) || !isFiniteValue(min_y) || !isFiniteValue(min_z)
+        || !isFiniteValue(max_x) || !isFiniteValue(max_y) || !isFiniteValue(max_z)) {
+        return false;
+    }
+
+    values[0] = area;
+    values[1] = min_x; values[2] = min_y; values[3] = min_z;
+    values[4] = max_x; values[5] = max_y; values[6] = max_z;
     return true;
 }
 
@@ -214,6 +244,38 @@ extern "C" int32_t umlcad_occt_shape_topology_counts(
             TopTools_IndexedMapOfShape unique_shapes;
             TopExp::MapShapes(input->value, kinds[index], unique_shapes);
             out_counts[index] = static_cast<uint32_t>(unique_shapes.Extent());
+        }
+        return UMLCAD_OCCT_OK;
+    } catch (...) { return UMLCAD_OCCT_INTERNAL_ERROR; }
+}
+
+extern "C" int32_t umlcad_occt_shape_face_descriptor_count(
+    const umlcad_occt_shape* input, uint32_t* out_count) {
+    if (input == nullptr || out_count == nullptr) return UMLCAD_OCCT_INVALID_ARGUMENT;
+    *out_count = 0;
+    try {
+        if (input->value.IsNull()) return UMLCAD_OCCT_NULL_SHAPE;
+        uint32_t count = 0;
+        for (TopExp_Explorer explorer(input->value, TopAbs_FACE); explorer.More(); explorer.Next()) {
+            ++count;
+        }
+        *out_count = count;
+        return UMLCAD_OCCT_OK;
+    } catch (...) { return UMLCAD_OCCT_INTERNAL_ERROR; }
+}
+
+extern "C" int32_t umlcad_occt_shape_face_descriptors(
+    const umlcad_occt_shape* input, double* out_values, uint32_t capacity) {
+    if (input == nullptr || out_values == nullptr) return UMLCAD_OCCT_INVALID_ARGUMENT;
+    try {
+        if (input->value.IsNull()) return UMLCAD_OCCT_NULL_SHAPE;
+        uint32_t index = 0;
+        for (TopExp_Explorer explorer(input->value, TopAbs_FACE); explorer.More(); explorer.Next()) {
+            if (index >= capacity) return UMLCAD_OCCT_INVALID_ARGUMENT;
+            if (!faceDescriptor(explorer.Current(), out_values + (static_cast<size_t>(index) * 7U))) {
+                return UMLCAD_OCCT_INTERNAL_ERROR;
+            }
+            ++index;
         }
         return UMLCAD_OCCT_OK;
     } catch (...) { return UMLCAD_OCCT_INTERNAL_ERROR; }
