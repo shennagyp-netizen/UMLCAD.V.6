@@ -7,9 +7,13 @@
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Shape.hxx>
+#include <gp_Ax1.hxx>
+#include <gp_Dir.hxx>
+#include <gp_Pnt.hxx>
 #include <gp_Trsf.hxx>
 #include <gp_Vec.hxx>
 
+#include <cmath>
 #include <new>
 
 struct umlcad_occt_shape {
@@ -23,6 +27,14 @@ bool hasSolid(const TopoDS_Shape& shape) {
         return true;
     }
     return false;
+}
+
+bool finite(double value) {
+    return std::isfinite(value);
+}
+
+bool finiteAxis(double x, double y, double z) {
+    return finite(x) && finite(y) && finite(z) && (x != 0.0 || y != 0.0 || z != 0.0);
 }
 
 }
@@ -114,6 +126,53 @@ extern "C" int32_t umlcad_occt_shape_translate(
         }
 
         auto* result = new (std::nothrow) umlcad_occt_shape{translated};
+        if (result == nullptr) {
+            return UMLCAD_OCCT_INTERNAL_ERROR;
+        }
+
+        *out_shape = result;
+        return UMLCAD_OCCT_OK;
+    } catch (...) {
+        return UMLCAD_OCCT_INTERNAL_ERROR;
+    }
+}
+
+extern "C" int32_t umlcad_occt_shape_rotate(
+    const umlcad_occt_shape* input,
+    double axis_x,
+    double axis_y,
+    double axis_z,
+    double angle_radians,
+    umlcad_occt_shape** out_shape) {
+    if (input == nullptr || out_shape == nullptr) {
+        return UMLCAD_OCCT_INVALID_ARGUMENT;
+    }
+    *out_shape = nullptr;
+
+    if (!finiteAxis(axis_x, axis_y, axis_z) || !finite(angle_radians)) {
+        return UMLCAD_OCCT_INVALID_ARGUMENT;
+    }
+
+    try {
+        if (input->value.IsNull()) {
+            return UMLCAD_OCCT_NULL_SHAPE;
+        }
+
+        const gp_Ax1 axis(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(axis_x, axis_y, axis_z));
+        gp_Trsf transformation;
+        transformation.SetRotation(axis, angle_radians);
+
+        BRepBuilderAPI_Transform transformer(input->value, transformation, true);
+        if (!transformer.IsDone()) {
+            return UMLCAD_OCCT_TRANSFORM_FAILED;
+        }
+
+        const TopoDS_Shape rotated = transformer.Shape();
+        if (rotated.IsNull()) {
+            return UMLCAD_OCCT_TRANSFORM_FAILED;
+        }
+
+        auto* result = new (std::nothrow) umlcad_occt_shape{rotated};
         if (result == nullptr) {
             return UMLCAD_OCCT_INTERNAL_ERROR;
         }
