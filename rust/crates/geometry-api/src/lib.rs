@@ -83,6 +83,16 @@ pub trait GeometryBackend {
         tolerance: ToleranceContext,
     ) -> Result<GeometryResult<Self::Shape>, GeometryError>;
 
+    fn rotate(
+        &self,
+        shape: &Self::Shape,
+        axis_x: f64,
+        axis_y: f64,
+        axis_z: f64,
+        angle_radians: f64,
+        tolerance: ToleranceContext,
+    ) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+
     fn validate(
         &self,
         shape: &Self::Shape,
