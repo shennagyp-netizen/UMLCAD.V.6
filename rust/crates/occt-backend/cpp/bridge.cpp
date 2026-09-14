@@ -1,5 +1,7 @@
 #include "bridge.hpp"
 
+#include <Bnd_Box.hxx>
+#include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
@@ -179,6 +181,53 @@ extern "C" int32_t umlcad_occt_shape_rotate(
         }
 
         *out_shape = result;
+        return UMLCAD_OCCT_OK;
+    } catch (...) {
+        return UMLCAD_OCCT_INTERNAL_ERROR;
+    }
+}
+
+extern "C" int32_t umlcad_occt_shape_bounding_box(
+    const umlcad_occt_shape* input,
+    double* out_bounds) {
+    if (input == nullptr || out_bounds == nullptr) {
+        return UMLCAD_OCCT_INVALID_ARGUMENT;
+    }
+
+    for (int index = 0; index < 6; ++index) {
+        out_bounds[index] = 0.0;
+    }
+
+    try {
+        if (input->value.IsNull()) {
+            return UMLCAD_OCCT_NULL_SHAPE;
+        }
+
+        Bnd_Box box;
+        BRepBndLib::Add(input->value, box);
+        if (box.IsVoid()) {
+            return UMLCAD_OCCT_TRANSFORM_FAILED;
+        }
+
+        double min_x;
+        double min_y;
+        double min_z;
+        double max_x;
+        double max_y;
+        double max_z;
+        box.Get(min_x, min_y, min_z, max_x, max_y, max_z);
+
+        if (!isFiniteValue(min_x) || !isFiniteValue(min_y) || !isFiniteValue(min_z)
+            || !isFiniteValue(max_x) || !isFiniteValue(max_y) || !isFiniteValue(max_z)) {
+            return UMLCAD_OCCT_INTERNAL_ERROR;
+        }
+
+        out_bounds[0] = min_x;
+        out_bounds[1] = min_y;
+        out_bounds[2] = min_z;
+        out_bounds[3] = max_x;
+        out_bounds[4] = max_y;
+        out_bounds[5] = max_z;
         return UMLCAD_OCCT_OK;
     } catch (...) {
         return UMLCAD_OCCT_INTERNAL_ERROR;
