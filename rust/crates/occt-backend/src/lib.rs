@@ -1,15 +1,115 @@
-use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryResult, ToleranceContext, ValidationResult};
+use std::ffi::c_void;
+use std::ptr::NonNull;
 
-/// OCCT integration boundary.
-///
-/// This crate deliberately does not expose OCCT C++ types to the rest of UMLCAD.
-/// The actual FFI/build integration is introduced only after the backend-neutral
-/// contract and red-team fixtures are established.
+use umlcad_v6_geometry_api::{
+    GeometryBackend, GeometryError, GeometryEvidence, GeometryKind, GeometryResult,
+    GeometryStatus, ToleranceContext, ValidationResult,
+};
+
+#[repr(C)]
+struct NativeShape {
+    _private: [u8; 0],
+}
+
+unsafe extern "C" {
+    fn umlcad_occt_box(
+        width: f64,
+        depth: f64,
+        height: f64,
+        out_shape: *mut *mut NativeShape,
+    ) -> i32;
+
+    fn umlcad_occt_shape_clone(
+        input: *const NativeShape,
+        out_shape: *mut *mut NativeShape,
+    ) -> i32;
+
+    fn umlcad_occt_shape_translate(
+        input: *const NativeShape,
+        dx: f64,
+        dy: f64,
+        dz: f64,
+        out_shape: *mut *mut NativeShape,
+    ) -> i32;
+
+    fn umlcad_occt_shape_validate(
+        input: *const NativeShape,
+        valid: *mut i32,
+        manifold: *mut i32,
+    ) -> i32;
+
+    fn umlcad_occt_shape_delete(shape: *mut NativeShape);
+}
+
+const OCCT_OK: i32 = 0;
+const OCCT_INVALID_ARGUMENT: i32 = 1;
+const OCCT_NULL_SHAPE: i32 = 2;
+const OCCT_CONSTRUCTION_FAILED: i32 = 3;
+const OCCT_TRANSFORM_FAILED: i32 = 4;
+const OCCT_INTERNAL_ERROR: i32 = 5;
+
+pub struct OcctShape {
+    raw: NonNull<NativeShape>,
+}
+
+impl Clone for OcctShape {
+    fn clone(&self) -> Self {
+        let mut output = std::ptr::null_mut();
+        let status = unsafe { umlcad_occt_shape_clone(self.raw.as_ptr(), &mut output) };
+        assert_eq!(status, OCCT_OK, "OCCT shape clone failed with status {status}");
+        let raw = NonNull::new(output).expect("OCCT clone returned a null shape");
+        Self { raw }
+    }
+}
+
+impl Drop for OcctShape {
+    fn drop(&mut self) {
+        unsafe { umlcad_occt_shape_delete(self.raw.as_ptr()) };
+    }
+}
+
 pub struct OcctBackend;
 
 impl OcctBackend {
     pub const fn new() -> Self {
         Self
+    }
+
+    fn validate_dimensions(width: f64, depth: f64, height: f64) -> Result<(), GeometryError> {
+        if !width.is_finite() || !depth.is_finite() || !height.is_finite() {
+            return Err(GeometryError::InvalidInput("box dimensions must be finite"));
+        }
+        if width <= 0.0 || depth <= 0.0 || height <= 0.0 {
+            return Err(GeometryError::InvalidInput("box dimensions must be positive"));
+        }
+        Ok(())
+    }
+
+    fn validate_translation(dx: f64, dy: f64, dz: f64) -> Result<(), GeometryError> {
+        if !dx.is_finite() || !dy.is_finite() || !dz.is_finite() {
+            return Err(GeometryError::InvalidInput("translation must be finite"));
+        }
+        Ok(())
+    }
+
+    fn map_status(status: i32, operation: &'static str) -> GeometryError {
+        match status {
+            OCCT_INVALID_ARGUMENT => GeometryError::InvalidInput(operation),
+            OCCT_NULL_SHAPE => GeometryError::InvalidInput("OCCT shape is null"),
+            OCCT_CONSTRUCTION_FAILED => GeometryError::Unsupported("OCCT construction failed"),
+            OCCT_TRANSFORM_FAILED => GeometryError::Unsupported("OCCT transform failed"),
+            OCCT_INTERNAL_ERROR => GeometryError::Unsupported("OCCT internal failure"),
+            _ => GeometryError::Unsupported("unknown OCCT status"),
+        }
+    }
+
+    fn evidence(&self, status: GeometryStatus, tolerance: ToleranceContext, message: Option<String>) -> GeometryEvidence {
+        GeometryEvidence {
+            status,
+            backend: self.backend_name(),
+            tolerance,
+            message,
+        }
     }
 }
 
@@ -20,7 +120,7 @@ impl Default for OcctBackend {
 }
 
 impl GeometryBackend for OcctBackend {
-    type Shape = ();
+    type Shape = OcctShape;
 
     fn backend_name(&self) -> &'static str {
         "occt"
@@ -28,30 +128,83 @@ impl GeometryBackend for OcctBackend {
 
     fn box_solid(
         &self,
-        _width: f64,
-        _depth: f64,
-        _height: f64,
-        _tolerance: ToleranceContext,
+        width: f64,
+        depth: f64,
+        height: f64,
+        tolerance: ToleranceContext,
     ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
-        Err(GeometryError::Unsupported("OCCT bridge not implemented yet"))
+        tolerance.validate()?;
+        Self::validate_dimensions(width, depth, height)?;
+
+        let mut output = std::ptr::null_mut();
+        let status = unsafe { umlcad_occt_box(width, depth, height, &mut output) };
+        if status != OCCT_OK {
+            return Err(Self::map_status(status, "OCCT box construction failed"));
+        }
+
+        let raw = NonNull::new(output).ok_or(GeometryError::Unsupported("OCCT returned a null shape"))?;
+        let shape = OcctShape { raw };
+
+        Ok(GeometryResult {
+            shape,
+            kind: GeometryKind::Solid,
+            evidence: self.evidence(GeometryStatus::Success, tolerance, None),
+        })
     }
 
     fn translate(
         &self,
-        _shape: &Self::Shape,
-        _dx: f64,
-        _dy: f64,
-        _dz: f64,
+        shape: &Self::Shape,
+        dx: f64,
+        dy: f64,
+        dz: f64,
     ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
-        Err(GeometryError::Unsupported("OCCT bridge not implemented yet"))
+        Self::validate_translation(dx, dy, dz)?;
+
+        let mut output = std::ptr::null_mut();
+        let status = unsafe {
+            umlcad_occt_shape_translate(shape.raw.as_ptr(), dx, dy, dz, &mut output)
+        };
+        if status != OCCT_OK {
+            return Err(Self::map_status(status, "OCCT translation failed"));
+        }
+
+        let raw = NonNull::new(output).ok_or(GeometryError::Unsupported("OCCT returned a null shape"))?;
+        Ok(GeometryResult {
+            shape: OcctShape { raw },
+            kind: GeometryKind::Solid,
+            evidence: self.evidence(
+                GeometryStatus::Success,
+                ToleranceContext {
+                    modeling: 0.0,
+                    validation: 0.0,
+                },
+                None,
+            ),
+        })
     }
 
     fn validate(
         &self,
-        _shape: &Self::Shape,
-        _tolerance: ToleranceContext,
+        shape: &Self::Shape,
+        tolerance: ToleranceContext,
     ) -> Result<ValidationResult, GeometryError> {
-        Err(GeometryError::Unsupported("OCCT bridge not implemented yet"))
+        tolerance.validate()?;
+
+        let mut valid = 0;
+        let mut manifold = 0;
+        let status = unsafe {
+            umlcad_occt_shape_validate(shape.raw.as_ptr(), &mut valid, &mut manifold)
+        };
+        if status != OCCT_OK {
+            return Err(Self::map_status(status, "OCCT validation failed"));
+        }
+
+        Ok(ValidationResult {
+            valid: valid != 0,
+            manifold: manifold != 0,
+            message: None,
+        })
     }
 }
 
@@ -59,27 +212,81 @@ impl GeometryBackend for OcctBackend {
 mod tests {
     use super::*;
 
+    const TOLERANCE: ToleranceContext = ToleranceContext {
+        modeling: 1e-9,
+        validation: 1e-9,
+    };
+
     #[test]
     fn backend_name_is_stable() {
         assert_eq!(OcctBackend::new().backend_name(), "occt");
     }
 
     #[test]
-    fn unimplemented_backend_is_explicitly_unsupported() {
-        let result = OcctBackend::new().box_solid(
-            10.0,
-            20.0,
-            30.0,
-            ToleranceContext {
-                modeling: 1e-9,
-                validation: 1e-9,
-            },
-        );
+    fn valid_box_is_constructed_and_validated() {
+        let backend = OcctBackend::new();
+        let result = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap();
+        assert_eq!(result.kind, GeometryKind::Solid);
+        assert_eq!(result.evidence.status, GeometryStatus::Success);
+        assert_eq!(backend.validate(&result.shape, TOLERANCE).unwrap(), ValidationResult {
+            valid: true,
+            manifold: true,
+            message: None,
+        });
+    }
 
-        match result {
-            Err(GeometryError::Unsupported("OCCT bridge not implemented yet")) => {}
-            Err(other) => panic!("unexpected geometry error: {other:?}"),
-            Ok(_) => panic!("unimplemented OCCT backend unexpectedly returned geometry"),
+    #[test]
+    fn invalid_box_dimensions_are_rejected_before_ffi() {
+        let backend = OcctBackend::new();
+        for dimensions in [
+            (0.0, 20.0, 30.0),
+            (-1.0, 20.0, 30.0),
+            (f64::NAN, 20.0, 30.0),
+            (f64::INFINITY, 20.0, 30.0),
+        ] {
+            match backend.box_solid(dimensions.0, dimensions.1, dimensions.2, TOLERANCE) {
+                Err(GeometryError::InvalidInput(_)) => {}
+                other => panic!("unexpected result for invalid dimensions: {other:?}"),
+            }
         }
+    }
+
+    #[test]
+    fn invalid_translation_is_rejected() {
+        let backend = OcctBackend::new();
+        let shape = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
+        for translation in [(f64::NAN, 0.0, 0.0), (0.0, f64::INFINITY, 0.0)] {
+            match backend.translate(&shape, translation.0, translation.1, translation.2) {
+                Err(GeometryError::InvalidInput(_)) => {}
+                other => panic!("unexpected translation result: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn translation_returns_new_valid_shape_and_preserves_source() {
+        let backend = OcctBackend::new();
+        let source = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
+        let translated = backend.translate(&source, 1000.0, -2000.0, 3000.0).unwrap().shape;
+
+        assert_eq!(backend.validate(&source, TOLERANCE).unwrap(), ValidationResult {
+            valid: true,
+            manifold: true,
+            message: None,
+        });
+        assert_eq!(backend.validate(&translated, TOLERANCE).unwrap(), ValidationResult {
+            valid: true,
+            manifold: true,
+            message: None,
+        });
+    }
+
+    #[test]
+    fn clone_has_independent_owner() {
+        let backend = OcctBackend::new();
+        let original = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
+        let clone = original.clone();
+        drop(original);
+        assert_eq!(backend.validate(&clone, TOLERANCE).unwrap().valid, true);
     }
 }
