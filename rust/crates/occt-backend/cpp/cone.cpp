@@ -3,7 +3,15 @@
 #include <BRepPrimAPI_MakeCone.hxx>
 #include <TopoDS_Shape.hxx>
 
+#include <cmath>
 #include <new>
+
+// Keep this definition identical to the private native shape in bridge.cpp.
+// The C ABI only exposes the pointer opaquely; the complete type is required
+// here solely to allocate the native owner.
+struct umlcad_occt_shape {
+    TopoDS_Shape value;
+};
 
 extern "C" int32_t umlcad_occt_cone(
     double base_radius,
@@ -15,7 +23,8 @@ extern "C" int32_t umlcad_occt_cone(
     }
     *out_shape = nullptr;
 
-    if (!(base_radius > 0.0) || !(top_radius > 0.0) || !(height > 0.0)) {
+    if (!(base_radius > 0.0) || !(top_radius > 0.0) || !(height > 0.0)
+        || !std::isfinite(base_radius) || !std::isfinite(top_radius) || !std::isfinite(height)) {
         return UMLCAD_OCCT_INVALID_ARGUMENT;
     }
 
