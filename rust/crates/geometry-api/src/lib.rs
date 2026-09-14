@@ -111,12 +111,21 @@ mod tests {
     #[test]
     fn tolerance_must_be_finite_and_non_negative() {
         assert!(ToleranceContext { modeling: 0.0, validation: 1e-9 }.validate().is_ok());
+        assert!(ToleranceContext { modeling: 1e-9, validation: 0.0 }.validate().is_ok());
         assert_eq!(
             ToleranceContext { modeling: -1.0, validation: 0.0 }.validate(),
             Err(GeometryError::InvalidTolerance)
         );
         assert_eq!(
+            ToleranceContext { modeling: 0.0, validation: -1e-12 }.validate(),
+            Err(GeometryError::InvalidTolerance)
+        );
+        assert_eq!(
             ToleranceContext { modeling: f64::NAN, validation: 0.0 }.validate(),
+            Err(GeometryError::InvalidTolerance)
+        );
+        assert_eq!(
+            ToleranceContext { modeling: 0.0, validation: f64::INFINITY }.validate(),
             Err(GeometryError::InvalidTolerance)
         );
     }
