@@ -19,8 +19,16 @@ fn sorted_edges(mut values: Vec<EdgeDescriptor>) -> Vec<EdgeDescriptor> {
     values
 }
 
+fn find_unique_edge(edges: &[EdgeDescriptor]) -> EdgeDescriptor {
+    edges
+        .iter()
+        .copied()
+        .find(|candidate| edges.iter().filter(|other| **other == *candidate).count() == 1)
+        .expect("fixture must contain at least one geometrically unique edge")
+}
+
 #[test]
-fn box_edge_evidence_has_twelve_valid_edges_and_two_face_uses() {
+fn box_edge_evidence_has_twelve_unique_edges_and_two_face_uses() {
     let backend = OcctBackend::new();
     let shape = backend.box_solid(10.0, 20.0, 30.0, T).unwrap().shape;
     let edges = sorted_edges(backend.edge_descriptors(&shape, T).unwrap());
@@ -54,15 +62,7 @@ fn unique_geometric_edge_query_resolves_without_traversal_identity() {
     let backend = OcctBackend::new();
     let shape = backend.box_solid(10.0, 20.0, 30.0, T).unwrap().shape;
     let edges = backend.edge_descriptors(&shape, T).unwrap();
-    let query = edges.iter().find(|edge| {
-        (edge.length - 30.0).abs() <= 1e-9
-            && (edge.bounds.min_x - 0.0).abs() <= 1e-9
-            && (edge.bounds.min_y - 0.0).abs() <= 1e-9
-            && (edge.bounds.min_z - 0.0).abs() <= 1e-9
-            && (edge.bounds.max_x - 0.0).abs() <= 1e-9
-            && (edge.bounds.max_y - 0.0).abs() <= 1e-9
-            && (edge.bounds.max_z - 30.0).abs() <= 1e-9
-    }).copied().unwrap();
+    let query = find_unique_edge(&edges);
 
     assert_eq!(
         backend.resolve_edge_descriptor(&shape, &query, T).unwrap(),
@@ -74,7 +74,7 @@ fn unique_geometric_edge_query_resolves_without_traversal_identity() {
 fn tolerance_small_edge_change_resolves_but_large_change_does_not() {
     let backend = OcctBackend::new();
     let shape = backend.box_solid(10.0, 20.0, 30.0, T).unwrap().shape;
-    let original = backend.edge_descriptors(&shape, T).unwrap()[0];
+    let original = find_unique_edge(&backend.edge_descriptors(&shape, T).unwrap());
 
     let near = EdgeDescriptor { length: original.length + 5e-7, ..original };
     assert!(matches!(
