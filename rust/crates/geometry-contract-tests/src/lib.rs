@@ -34,7 +34,7 @@ pub fn assert_box_requires_positive_dimensions<B: GeometryBackend>(backend: &B) 
 }
 
 pub fn assert_reference_backend_resolution_is_explicit<B: GeometryBackend>(backend: &B) {
-    for edge in [1e-8, 1e-7] {
+    for edge in [1e-8, 1e-7, 1e-6] {
         match backend.box_solid(edge, edge * 2.0, edge * 3.0, TOLERANCE) {
             Err(GeometryError::InvalidInput(_)) => {}
             Err(other) => panic!("unexpected resolution error at {edge:e}: {other}"),
