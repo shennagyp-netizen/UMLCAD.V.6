@@ -9,6 +9,7 @@ find_package(OpenCASCADE REQUIRED)
 
 add_library(umlcad_occt_bridge SHARED
     cpp/bridge.cpp
+    cpp/cone.cpp
 )
 
 target_include_directories(umlcad_occt_bridge
@@ -21,9 +22,6 @@ target_link_directories(umlcad_occt_bridge
         ${OpenCASCADE_LIBRARY_DIR}
 )
 
-# Keep the reference bridge deliberately narrow. The Ubuntu OpenCASCADE
-# package exports a global library list containing optional toolkits that this
-# bridge does not use (STEP, XDE, Draw, visualization, etc.).
 target_link_libraries(umlcad_occt_bridge
     PRIVATE
         TKPrim
