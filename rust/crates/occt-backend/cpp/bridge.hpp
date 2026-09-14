@@ -22,6 +22,8 @@ int32_t umlcad_occt_shape_translate(const umlcad_occt_shape* input,double dx,dou
 int32_t umlcad_occt_shape_rotate(const umlcad_occt_shape* input,double axis_x,double axis_y,double axis_z,double angle_radians,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_shape_bounding_box(const umlcad_occt_shape* input,double* out_bounds);
 int32_t umlcad_occt_shape_topology_counts(const umlcad_occt_shape* input,uint32_t* out_counts);
+int32_t umlcad_occt_shape_face_descriptor_count(const umlcad_occt_shape* input,uint32_t* out_count);
+int32_t umlcad_occt_shape_face_descriptors(const umlcad_occt_shape* input,double* out_values,uint32_t capacity);
 int32_t umlcad_occt_shape_validate(const umlcad_occt_shape* input,int32_t* valid,int32_t* manifold);
 void umlcad_occt_shape_delete(umlcad_occt_shape* shape);
 #ifdef __cplusplus
