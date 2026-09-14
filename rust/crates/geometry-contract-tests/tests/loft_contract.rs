@@ -12,12 +12,12 @@ fn equal_vertex_sections_loft_into_valid_solid() {
 
     assert!(backend.validate(&result.shape, T).unwrap().valid);
     let bounds = backend.bounding_box(&result.shape, T).unwrap();
-    assert!((bounds.min_x - 0.0).abs() <= 1e-9);
-    assert!((bounds.max_x - 20.0).abs() <= 1e-9);
-    assert!((bounds.min_y - 0.0).abs() <= 1e-9);
-    assert!((bounds.max_y - 10.0).abs() <= 1e-9);
-    assert!((bounds.min_z - 0.0).abs() <= 1e-9);
-    assert!((bounds.max_z - 30.0).abs() <= 1e-9);
+    assert!((bounds.min_x - 0.0).abs() <= 1e-9, "unexpected loft bounds: {:?}", bounds);
+    assert!((bounds.max_x - 20.0).abs() <= 1e-9, "unexpected loft bounds: {:?}", bounds);
+    assert!((bounds.min_y - 0.0).abs() <= 1e-9, "unexpected loft bounds: {:?}", bounds);
+    assert!((bounds.max_y - 10.0).abs() <= 1e-9, "unexpected loft bounds: {:?}", bounds);
+    assert!((bounds.min_z - 0.0).abs() <= 1e-9, "unexpected loft bounds: {:?}", bounds);
+    assert!((bounds.max_z - 30.0).abs() <= 1e-9, "unexpected loft bounds: {:?}", bounds);
     assert_eq!(backend.topology_counts(&result.shape, T).unwrap().solids, 1);
 }
 
@@ -28,9 +28,18 @@ fn loft_rejects_invalid_sections() {
     let rectangle = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)];
     let nan_section = [(0.0, 0.0), (f64::NAN, 0.0), (0.0, 10.0)];
 
-    assert!(matches!(backend.loft_between_polygons(&triangle, 0.0, &rectangle, 10.0, T), Err(GeometryError::InvalidInput(_))));
-    assert!(matches!(backend.loft_between_polygons(&nan_section, 0.0, &triangle, 10.0, T), Err(GeometryError::InvalidInput(_))));
-    assert!(matches!(backend.loft_between_polygons(&triangle, 5.0, &triangle, 5.0, T), Err(GeometryError::InvalidInput(_))));
+    assert!(matches!(
+        backend.loft_between_polygons(&triangle, 0.0, &rectangle, 10.0, T),
+        Err(GeometryError::InvalidInput(_))
+    ));
+    assert!(matches!(
+        backend.loft_between_polygons(&nan_section, 0.0, &triangle, 10.0, T),
+        Err(GeometryError::InvalidInput(_))
+    ));
+    assert!(matches!(
+        backend.loft_between_polygons(&triangle, 5.0, &triangle, 5.0, T),
+        Err(GeometryError::InvalidInput(_))
+    ));
 }
 
 #[test]
