@@ -1,8 +1,8 @@
 use std::ptr::NonNull;
 
 use umlcad_v6_geometry_api::{
-    GeometryBackend, GeometryError, GeometryEvidence, GeometryKind, GeometryResult,
-    GeometryStatus, ToleranceContext, ValidationResult,
+    GeometryBackend, GeometryError, GeometryEvidence, GeometryKind, GeometryResult, GeometryStatus,
+    ToleranceContext, ValidationResult,
 };
 
 #[repr(C)]
@@ -232,7 +232,8 @@ mod tests {
         ] {
             match backend.box_solid(dimensions.0, dimensions.1, dimensions.2, TOLERANCE) {
                 Err(GeometryError::InvalidInput(_)) => {}
-                other => panic!("unexpected result for invalid dimensions: {other:?}"),
+                Err(err) => panic!("unexpected geometry error: {err:?}"),
+                Ok(_) => panic!("invalid dimensions unexpectedly succeeded"),
             }
         }
     }
@@ -244,7 +245,8 @@ mod tests {
         for translation in [(f64::NAN, 0.0, 0.0), (0.0, f64::INFINITY, 0.0)] {
             match backend.translate(&shape, translation.0, translation.1, translation.2, TOLERANCE) {
                 Err(GeometryError::InvalidInput(_)) => {}
-                other => panic!("unexpected translation result: {other:?}"),
+                Err(err) => panic!("unexpected translation error: {err:?}"),
+                Ok(_) => panic!("invalid translation unexpectedly succeeded"),
             }
         }
     }
