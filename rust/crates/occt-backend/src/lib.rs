@@ -31,6 +31,10 @@ const OCCT_CONSTRUCTION_FAILED: i32 = 3;
 const OCCT_TRANSFORM_FAILED: i32 = 4;
 const OCCT_INTERNAL_ERROR: i32 = 5;
 
+/// Conservative minimum edge length observed for the current Ubuntu/OCCT reference build.
+/// This is a backend capability limit, not UMLCAD's semantic modeling tolerance.
+const OCCT_REFERENCE_MIN_BOX_EDGE: f64 = 1e-6;
+
 pub struct OcctShape {
     raw: NonNull<NativeShape>,
 }
@@ -70,9 +74,11 @@ impl OcctBackend {
         if width <= 0.0 || depth <= 0.0 || height <= 0.0 {
             return Err(GeometryError::InvalidInput("box dimensions must be positive"));
         }
-        if width <= modeling_tolerance || depth <= modeling_tolerance || height <= modeling_tolerance {
+
+        let minimum_edge = OCCT_REFERENCE_MIN_BOX_EDGE.max(modeling_tolerance);
+        if width <= minimum_edge || depth <= minimum_edge || height <= minimum_edge {
             return Err(GeometryError::InvalidInput(
-                "box dimensions must exceed modeling tolerance",
+                "box dimensions are below the reference backend resolution",
             ));
         }
         Ok(())
@@ -254,9 +260,9 @@ mod tests {
     }
 
     #[test]
-    fn dimensions_at_or_below_modeling_tolerance_are_rejected_before_ffi() {
+    fn dimensions_at_or_below_reference_resolution_are_rejected_before_ffi() {
         let backend = OcctBackend::new();
-        for edge in [1e-12, 5e-10, 1e-9] {
+        for edge in [1e-12, 5e-10, 1e-9, 1e-8, 1e-7, 1e-6] {
             match backend.box_solid(edge, edge * 2.0, edge * 3.0, TOLERANCE) {
                 Err(GeometryError::InvalidInput(_)) => {}
                 Err(err) => panic!("unexpected resolution-boundary error: {err:?}"),
@@ -310,7 +316,7 @@ mod tests {
     #[test]
     fn numeric_scale_survives_validation() {
         let backend = OcctBackend::new();
-        for edge in [1e-8, 1e-6, 1e3, 1e6] {
+        for edge in [2e-6, 1e-5, 1e-3, 1e3, 1e6] {
             let result = backend
                 .box_solid(edge, edge * 2.0, edge * 3.0, TOLERANCE)
                 .unwrap_or_else(|error| panic!("failed supported scale {edge:e}: {error}"));
