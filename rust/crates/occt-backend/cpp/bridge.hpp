@@ -24,6 +24,8 @@ int32_t umlcad_occt_shape_bounding_box(const umlcad_occt_shape* input,double* ou
 int32_t umlcad_occt_shape_topology_counts(const umlcad_occt_shape* input,uint32_t* out_counts);
 int32_t umlcad_occt_shape_face_descriptor_count(const umlcad_occt_shape* input,uint32_t* out_count);
 int32_t umlcad_occt_shape_face_descriptors(const umlcad_occt_shape* input,double* out_values,uint32_t capacity);
+int32_t umlcad_occt_shape_edge_descriptor_count(const umlcad_occt_shape* input,uint32_t* out_count);
+int32_t umlcad_occt_shape_edge_descriptors(const umlcad_occt_shape* input,double* out_values,uint32_t capacity);
 int32_t umlcad_occt_shape_validate(const umlcad_occt_shape* input,int32_t* valid,int32_t* manifold);
 void umlcad_occt_shape_delete(umlcad_occt_shape* shape);
 #ifdef __cplusplus
