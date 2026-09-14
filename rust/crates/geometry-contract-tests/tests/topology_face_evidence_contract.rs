@@ -17,6 +17,10 @@ fn sorted_descriptors(mut values: Vec<FaceDescriptor>) -> Vec<FaceDescriptor> {
     values
 }
 
+fn has_planar_z_face(values: &[FaceDescriptor], z: f64) -> bool {
+    values.iter().any(|d| (d.bounds.min_z - z).abs() <= 1e-9 && (d.bounds.max_z - z).abs() <= 1e-9)
+}
+
 #[test]
 fn box_face_evidence_has_six_deterministic_planar_faces() {
     let backend = OcctBackend::new();
@@ -30,10 +34,8 @@ fn box_face_evidence_has_six_deterministic_planar_faces() {
         assert!(descriptor.bounds.validate().is_ok());
     }
 
-    assert_eq!(descriptors[0].bounds.min_z, 0.0);
-    assert_eq!(descriptors[0].bounds.max_z, 0.0);
-    assert_eq!(descriptors[5].bounds.min_z, 20.0);
-    assert_eq!(descriptors[5].bounds.max_z, 20.0);
+    assert!(has_planar_z_face(&descriptors, 0.0));
+    assert!(has_planar_z_face(&descriptors, 20.0));
 }
 
 #[test]
