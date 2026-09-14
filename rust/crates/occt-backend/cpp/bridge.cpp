@@ -205,7 +205,7 @@ extern "C" int32_t umlcad_occt_shape_bounding_box(
 
         Bnd_Box box;
         box.SetGap(0.0);
-        BRepBndLib::Add(input->value, box);
+        BRepBndLib::AddOptimal(input->value, box, Standard_False, Standard_False);
         if (box.IsVoid()) {
             return UMLCAD_OCCT_TRANSFORM_FAILED;
         }
