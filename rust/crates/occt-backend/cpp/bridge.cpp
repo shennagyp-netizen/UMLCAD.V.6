@@ -5,6 +5,7 @@
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
+#include <BRepPrimAPI_MakeCylinder.hxx>
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
@@ -89,6 +90,38 @@ extern "C" int32_t umlcad_occt_box(
         }
 
         auto* result = new (std::nothrow) umlcad_occt_shape{box};
+        if (result == nullptr) {
+            return UMLCAD_OCCT_INTERNAL_ERROR;
+        }
+
+        *out_shape = result;
+        return UMLCAD_OCCT_OK;
+    } catch (...) {
+        return UMLCAD_OCCT_INTERNAL_ERROR;
+    }
+}
+
+extern "C" int32_t umlcad_occt_cylinder(
+    double radius,
+    double height,
+    umlcad_occt_shape** out_shape) {
+    if (out_shape == nullptr) {
+        return UMLCAD_OCCT_INVALID_ARGUMENT;
+    }
+    *out_shape = nullptr;
+
+    if (!(radius > 0.0) || !(height > 0.0)) {
+        return UMLCAD_OCCT_INVALID_ARGUMENT;
+    }
+
+    try {
+        const gp_Ax2 axis(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(0.0, 0.0, 1.0));
+        const TopoDS_Shape cylinder = BRepPrimAPI_MakeCylinder(axis, radius, height).Shape();
+        if (cylinder.IsNull()) {
+            return UMLCAD_OCCT_CONSTRUCTION_FAILED;
+        }
+
+        auto* result = new (std::nothrow) umlcad_occt_shape{cylinder};
         if (result == nullptr) {
             return UMLCAD_OCCT_INTERNAL_ERROR;
         }
