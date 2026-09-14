@@ -66,6 +66,15 @@ impl BoundingBox {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TopologyCounts {
+    pub solids: u32,
+    pub shells: u32,
+    pub faces: u32,
+    pub edges: u32,
+    pub vertices: u32,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct GeometryEvidence {
     pub status: GeometryStatus,
@@ -128,6 +137,12 @@ pub trait GeometryBackend {
         shape: &Self::Shape,
         tolerance: ToleranceContext,
     ) -> Result<BoundingBox, GeometryError>;
+
+    fn topology_counts(
+        &self,
+        shape: &Self::Shape,
+        tolerance: ToleranceContext,
+    ) -> Result<TopologyCounts, GeometryError>;
 
     fn validate(
         &self,
@@ -213,5 +228,18 @@ mod tests {
             .validate(),
             Err(GeometryError::InvalidInput("bounding box minimum exceeds maximum"))
         );
+    }
+
+    #[test]
+    fn topology_counts_are_explicit_and_unsigned() {
+        let counts = TopologyCounts {
+            solids: 1,
+            shells: 1,
+            faces: 6,
+            edges: 12,
+            vertices: 8,
+        };
+        assert_eq!(counts.solids, 1);
+        assert_eq!(counts.vertices, 8);
     }
 }
