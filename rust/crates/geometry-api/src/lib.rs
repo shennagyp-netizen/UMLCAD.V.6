@@ -25,6 +25,7 @@ pub trait GeometryBackend {
     fn cylinder_solid(&self,radius:f64,height:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
     fn sphere_solid(&self,radius:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
     fn cone_solid(&self,base_radius:f64,top_radius:f64,height:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
+    fn fuse(&self,left:&Self::Shape,right:&Self::Shape,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
     fn translate(&self,shape:&Self::Shape,dx:f64,dy:f64,dz:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
     fn rotate(&self,shape:&Self::Shape,axis_x:f64,axis_y:f64,axis_z:f64,angle_radians:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
     fn bounding_box(&self,shape:&Self::Shape,tolerance:ToleranceContext)->Result<BoundingBox,GeometryError>;
