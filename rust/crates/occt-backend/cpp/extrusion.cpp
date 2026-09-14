@@ -7,6 +7,7 @@
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
 
+#include <algorithm>
 #include <cmath>
 #include <new>
 #include <vector>
