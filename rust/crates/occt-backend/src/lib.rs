@@ -58,12 +58,22 @@ impl OcctBackend {
         Self
     }
 
-    fn validate_dimensions(width: f64, depth: f64, height: f64) -> Result<(), GeometryError> {
+    fn validate_dimensions(
+        width: f64,
+        depth: f64,
+        height: f64,
+        modeling_tolerance: f64,
+    ) -> Result<(), GeometryError> {
         if !width.is_finite() || !depth.is_finite() || !height.is_finite() {
             return Err(GeometryError::InvalidInput("box dimensions must be finite"));
         }
         if width <= 0.0 || depth <= 0.0 || height <= 0.0 {
             return Err(GeometryError::InvalidInput("box dimensions must be positive"));
+        }
+        if width <= modeling_tolerance || depth <= modeling_tolerance || height <= modeling_tolerance {
+            return Err(GeometryError::InvalidInput(
+                "box dimensions must exceed modeling tolerance",
+            ));
         }
         Ok(())
     }
@@ -122,7 +132,7 @@ impl GeometryBackend for OcctBackend {
         tolerance: ToleranceContext,
     ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
         tolerance.validate()?;
-        Self::validate_dimensions(width, depth, height)?;
+        Self::validate_dimensions(width, depth, height, tolerance.modeling)?;
 
         let mut output = std::ptr::null_mut();
         let status = unsafe { umlcad_occt_box(width, depth, height, &mut output) };
@@ -244,6 +254,18 @@ mod tests {
     }
 
     #[test]
+    fn dimensions_at_or_below_modeling_tolerance_are_rejected_before_ffi() {
+        let backend = OcctBackend::new();
+        for edge in [1e-12, 5e-10, 1e-9] {
+            match backend.box_solid(edge, edge * 2.0, edge * 3.0, TOLERANCE) {
+                Err(GeometryError::InvalidInput(_)) => {}
+                Err(err) => panic!("unexpected resolution-boundary error: {err:?}"),
+                Ok(_) => panic!("dimension {edge:e} unexpectedly succeeded"),
+            }
+        }
+    }
+
+    #[test]
     fn invalid_tolerance_is_rejected() {
         let backend = OcctBackend::new();
         for tolerance in [
@@ -288,13 +310,13 @@ mod tests {
     #[test]
     fn numeric_scale_survives_validation() {
         let backend = OcctBackend::new();
-        for edge in [1e-12, 1e-9, 1e-6, 1e3, 1e6] {
+        for edge in [1e-8, 1e-6, 1e3, 1e6] {
             let result = backend
                 .box_solid(edge, edge * 2.0, edge * 3.0, TOLERANCE)
-                .unwrap_or_else(|error| panic!("failed scale {edge:e}: {error}"));
+                .unwrap_or_else(|error| panic!("failed supported scale {edge:e}: {error}"));
             let validation = backend
                 .validate(&result.shape, TOLERANCE)
-                .unwrap_or_else(|error| panic!("validation failed at scale {edge:e}: {error}"));
+                .unwrap_or_else(|error| panic!("validation failed at supported scale {edge:e}: {error}"));
             assert_eq!(validation, ValidationResult {
                 valid: true,
                 manifold: true,
