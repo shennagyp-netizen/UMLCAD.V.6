@@ -70,7 +70,7 @@ fn full_containment_cut_is_rejected_when_result_is_empty() {
 }
 
 #[test]
-fn Boolean_results_are_deterministic_for_identical_operands() {
+fn boolean_results_are_deterministic_for_identical_operands() {
     let backend = OcctBackend::new();
     let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
     let right = shifted_box(&backend, 5.0);
