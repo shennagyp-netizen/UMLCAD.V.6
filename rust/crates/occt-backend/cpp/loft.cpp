@@ -3,12 +3,18 @@
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
+#include <TopAbs_ShapeEnum.hxx>
+#include <TopExp.hxx>
+#include <TopExp_Explorer.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Shell.hxx>
+#include <TopoDS.hxx>
 #include <gp_Pnt.hxx>
+#include <algorithm>
 #include <cmath>
 #include <new>
+#include <vector>
 
 struct umlcad_occt_shape { TopoDS_Shape value; };
 
