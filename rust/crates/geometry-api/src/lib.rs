@@ -80,6 +80,7 @@ pub trait GeometryBackend {
         dx: f64,
         dy: f64,
         dz: f64,
+        tolerance: ToleranceContext,
     ) -> Result<GeometryResult<Self::Shape>, GeometryError>;
 
     fn validate(
