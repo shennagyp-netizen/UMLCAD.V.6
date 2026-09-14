@@ -28,7 +28,7 @@ extern "C" int32_t umlcad_occt_loft_polygons(const double* lower_xy,uint32_t low
     try{
         bool lower_done=false,upper_done=false;TopoDS_Wire lower=makeWire(lower_xy,lower_count,lower_z,lower_done);TopoDS_Wire upper=makeWire(upper_xy,upper_count,upper_z,upper_done);
         if(!lower_done||!upper_done)return UMLCAD_OCCT_CONSTRUCTION_FAILED;
-        BRepOffsetAPI_ThruSections loft(true,false);loft.AddWire(lower);loft.AddWire(upper);loft.Build();if(!loft.IsDone())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
+        BRepOffsetAPI_ThruSections loft(true,true);loft.AddWire(lower);loft.AddWire(upper);loft.Build();if(!loft.IsDone())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
         TopoDS_Shape shape=loft.Shape();if(shape.IsNull())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
         auto* result=new(std::nothrow) umlcad_occt_shape{shape};if(!result)return UMLCAD_OCCT_INTERNAL_ERROR;*out_shape=result;return UMLCAD_OCCT_OK;
     }catch(...){return UMLCAD_OCCT_INTERNAL_ERROR;}
