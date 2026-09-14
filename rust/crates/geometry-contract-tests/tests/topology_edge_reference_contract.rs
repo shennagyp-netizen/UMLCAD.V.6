@@ -1,0 +1,118 @@
+use umlcad_v6_geometry_api::{EdgeDescriptor, GeometryBackend, ReferenceResolution, ToleranceContext};
+use umlcad_v6_occt_backend::OcctBackend;
+
+const T: ToleranceContext = ToleranceContext { modeling: 1e-9, validation: 1e-6 };
+
+fn sorted_edges(mut values: Vec<EdgeDescriptor>) -> Vec<EdgeDescriptor> {
+    values.sort_by(|a, b| {
+        a.length
+            .total_cmp(&b.length)
+            .then_with(|| a.bounds.min_x.total_cmp(&b.bounds.min_x))
+            .then_with(|| a.bounds.min_y.total_cmp(&b.bounds.min_y))
+            .then_with(|| a.bounds.min_z.total_cmp(&b.bounds.min_z))
+            .then_with(|| a.bounds.max_x.total_cmp(&b.bounds.max_x))
+            .then_with(|| a.bounds.max_y.total_cmp(&b.bounds.max_y))
+            .then_with(|| a.bounds.max_z.total_cmp(&b.bounds.max_z))
+            .then_with(|| a.face_use_count.cmp(&b.face_use_count))
+            .then_with(|| a.vertex_use_count.cmp(&b.vertex_use_count))
+    });
+    values
+}
+
+#[test]
+fn box_edge_evidence_has_twelve_valid_edges_and_two_face_uses() {
+    let backend = OcctBackend::new();
+    let shape = backend.box_solid(10.0, 20.0, 30.0, T).unwrap().shape;
+    let edges = sorted_edges(backend.edge_descriptors(&shape, T).unwrap());
+
+    assert_eq!(edges.len(), 12);
+    for edge in &edges {
+        assert!(edge.length.is_finite());
+        assert!(edge.length > 0.0);
+        assert_eq!(edge.face_use_count, 2);
+        assert_eq!(edge.vertex_use_count, 2);
+        assert!(edge.bounds.validate().is_ok());
+    }
+
+    assert_eq!(edges.iter().filter(|edge| (edge.length - 10.0).abs() <= 1e-9).count(), 4);
+    assert_eq!(edges.iter().filter(|edge| (edge.length - 20.0).abs() <= 1e-9).count(), 4);
+    assert_eq!(edges.iter().filter(|edge| (edge.length - 30.0).abs() <= 1e-9).count(), 4);
+}
+
+#[test]
+fn repeated_edge_evidence_is_deterministic() {
+    let backend = OcctBackend::new();
+    let shape = backend.box_solid(10.0, 20.0, 30.0, T).unwrap().shape;
+    assert_eq!(
+        sorted_edges(backend.edge_descriptors(&shape, T).unwrap()),
+        sorted_edges(backend.edge_descriptors(&shape, T).unwrap())
+    );
+}
+
+#[test]
+fn unique_geometric_edge_query_resolves_without_traversal_identity() {
+    let backend = OcctBackend::new();
+    let shape = backend.box_solid(10.0, 20.0, 30.0, T).unwrap().shape;
+    let edges = backend.edge_descriptors(&shape, T).unwrap();
+    let query = edges.iter().find(|edge| {
+        (edge.length - 30.0).abs() <= 1e-9
+            && (edge.bounds.min_x - 0.0).abs() <= 1e-9
+            && (edge.bounds.min_y - 0.0).abs() <= 1e-9
+            && (edge.bounds.min_z - 0.0).abs() <= 1e-9
+            && (edge.bounds.max_x - 0.0).abs() <= 1e-9
+            && (edge.bounds.max_y - 0.0).abs() <= 1e-9
+            && (edge.bounds.max_z - 30.0).abs() <= 1e-9
+    }).copied().unwrap();
+
+    assert_eq!(
+        backend.resolve_edge_descriptor(&shape, &query, T).unwrap(),
+        ReferenceResolution::Unique(query)
+    );
+}
+
+#[test]
+fn tolerance_small_edge_change_resolves_but_large_change_does_not() {
+    let backend = OcctBackend::new();
+    let shape = backend.box_solid(10.0, 20.0, 30.0, T).unwrap().shape;
+    let original = backend.edge_descriptors(&shape, T).unwrap()[0];
+
+    let near = EdgeDescriptor { length: original.length + 5e-7, ..original };
+    assert!(matches!(
+        backend.resolve_edge_descriptor(&shape, &near, T).unwrap(),
+        ReferenceResolution::Unique(_)
+    ));
+
+    let far = EdgeDescriptor { length: original.length + 5e-4, ..original };
+    assert_eq!(
+        backend.resolve_edge_descriptor(&shape, &far, T).unwrap(),
+        ReferenceResolution::NotFound
+    );
+}
+
+#[test]
+fn unmatched_geometric_edge_query_is_not_found() {
+    let backend = OcctBackend::new();
+    let shape = backend.box_solid(10.0, 20.0, 30.0, T).unwrap().shape;
+    let mut query = backend.edge_descriptors(&shape, T).unwrap()[0];
+    query.length = 1234.0;
+
+    assert_eq!(
+        backend.resolve_edge_descriptor(&shape, &query, T).unwrap(),
+        ReferenceResolution::NotFound
+    );
+}
+
+#[test]
+fn sphere_seam_edges_are_reported_without_assuming_two_distinct_adjacent_faces() {
+    let backend = OcctBackend::new();
+    let shape = backend.sphere_solid(5.0, T).unwrap().shape;
+    let edges = backend.edge_descriptors(&shape, T).unwrap();
+
+    assert_eq!(edges.len(), 3);
+    for edge in &edges {
+        assert!(edge.length.is_finite());
+        assert!(edge.length >= 0.0);
+        assert!(edge.face_use_count >= 1);
+        assert!(edge.vertex_use_count >= 1);
+    }
+}
