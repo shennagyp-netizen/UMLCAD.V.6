@@ -20,6 +20,14 @@ unsafe extern "C" {
         dz: f64,
         out_shape: *mut *mut NativeShape,
     ) -> i32;
+    fn umlcad_occt_shape_rotate(
+        input: *const NativeShape,
+        axis_x: f64,
+        axis_y: f64,
+        axis_z: f64,
+        angle_radians: f64,
+        out_shape: *mut *mut NativeShape,
+    ) -> i32;
     fn umlcad_occt_shape_validate(input: *const NativeShape, valid: *mut i32, manifold: *mut i32) -> i32;
     fn umlcad_occt_shape_delete(shape: *mut NativeShape);
 }
@@ -87,6 +95,25 @@ impl OcctBackend {
     fn validate_translation(dx: f64, dy: f64, dz: f64) -> Result<(), GeometryError> {
         if !dx.is_finite() || !dy.is_finite() || !dz.is_finite() {
             return Err(GeometryError::InvalidInput("translation must be finite"));
+        }
+        Ok(())
+    }
+
+    fn validate_rotation(
+        axis_x: f64,
+        axis_y: f64,
+        axis_z: f64,
+        angle_radians: f64,
+    ) -> Result<(), GeometryError> {
+        if !axis_x.is_finite()
+            || !axis_y.is_finite()
+            || !axis_z.is_finite()
+            || !angle_radians.is_finite()
+        {
+            return Err(GeometryError::InvalidInput("rotation must be finite"));
+        }
+        if axis_x == 0.0 && axis_y == 0.0 && axis_z == 0.0 {
+            return Err(GeometryError::InvalidInput("rotation axis must be non-zero"));
         }
         Ok(())
     }
@@ -174,6 +201,42 @@ impl GeometryBackend for OcctBackend {
         };
         if status != OCCT_OK {
             return Err(Self::map_status(status, "OCCT translation failed"));
+        }
+
+        let raw = NonNull::new(output)
+            .ok_or(GeometryError::Unsupported("OCCT returned a null shape"))?;
+        Ok(GeometryResult {
+            shape: OcctShape { raw },
+            kind: GeometryKind::Solid,
+            evidence: self.evidence(GeometryStatus::Success, tolerance, None),
+        })
+    }
+
+    fn rotate(
+        &self,
+        shape: &Self::Shape,
+        axis_x: f64,
+        axis_y: f64,
+        axis_z: f64,
+        angle_radians: f64,
+        tolerance: ToleranceContext,
+    ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
+        tolerance.validate()?;
+        Self::validate_rotation(axis_x, axis_y, axis_z, angle_radians)?;
+
+        let mut output = std::ptr::null_mut();
+        let status = unsafe {
+            umlcad_occt_shape_rotate(
+                shape.raw.as_ptr(),
+                axis_x,
+                axis_y,
+                axis_z,
+                angle_radians,
+                &mut output,
+            )
+        };
+        if status != OCCT_OK {
+            return Err(Self::map_status(status, "OCCT rotation failed"));
         }
 
         let raw = NonNull::new(output)
@@ -309,6 +372,39 @@ mod tests {
                 Err(GeometryError::InvalidInput(_)) => {}
                 Err(err) => panic!("unexpected translation error: {err:?}"),
                 Ok(_) => panic!("invalid translation unexpectedly succeeded"),
+            }
+        }
+    }
+
+    #[test]
+    fn rotation_preserves_validation_and_evidence() {
+        let backend = OcctBackend::new();
+        let source = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
+        for angle in [0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::PI] {
+            let rotated = backend.rotate(&source, 0.0, 0.0, 1.0, angle, TOLERANCE).unwrap();
+            assert_eq!(rotated.evidence.tolerance, TOLERANCE);
+            assert_eq!(rotated.kind, GeometryKind::Solid);
+            assert_eq!(backend.validate(&rotated.shape, TOLERANCE).unwrap(), ValidationResult {
+                valid: true,
+                manifold: true,
+                message: None,
+            });
+        }
+    }
+
+    #[test]
+    fn invalid_rotation_is_rejected_before_ffi() {
+        let backend = OcctBackend::new();
+        let shape = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
+        for input in [
+            (0.0, 0.0, 0.0, 0.0),
+            (0.0, 0.0, 1.0, f64::NAN),
+            (f64::INFINITY, 0.0, 1.0, 0.0),
+        ] {
+            match backend.rotate(&shape, input.0, input.1, input.2, input.3, TOLERANCE) {
+                Err(GeometryError::InvalidInput(_)) => {}
+                Err(err) => panic!("unexpected rotation error: {err:?}"),
+                Ok(_) => panic!("invalid rotation unexpectedly succeeded"),
             }
         }
     }
