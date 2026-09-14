@@ -12,6 +12,7 @@ struct NativeShape {
 
 unsafe extern "C" {
     fn umlcad_occt_box(width: f64, depth: f64, height: f64, out_shape: *mut *mut NativeShape) -> i32;
+    fn umlcad_occt_cylinder(radius: f64, height: f64, out_shape: *mut *mut NativeShape) -> i32;
     fn umlcad_occt_shape_clone(input: *const NativeShape, out_shape: *mut *mut NativeShape) -> i32;
     fn umlcad_occt_shape_translate(
         input: *const NativeShape,
@@ -41,9 +42,9 @@ const OCCT_CONSTRUCTION_FAILED: i32 = 3;
 const OCCT_TRANSFORM_FAILED: i32 = 4;
 const OCCT_INTERNAL_ERROR: i32 = 5;
 
-/// Conservative minimum edge length observed for the current Ubuntu/OCCT reference build.
+/// Conservative minimum linear feature size observed for the current Ubuntu/OCCT reference build.
 /// This is a backend capability limit, not UMLCAD's semantic modeling tolerance.
-const OCCT_REFERENCE_MIN_BOX_EDGE: f64 = 1e-6;
+const OCCT_REFERENCE_MIN_FEATURE: f64 = 1e-6;
 
 pub struct OcctShape {
     raw: NonNull<NativeShape>,
@@ -72,25 +73,41 @@ impl OcctBackend {
         Self
     }
 
+    fn validate_positive_feature(value: f64, modeling_tolerance: f64, label: &'static str) -> Result<(), GeometryError> {
+        if !value.is_finite() {
+            return Err(GeometryError::InvalidInput(label));
+        }
+        if value <= 0.0 {
+            return Err(GeometryError::InvalidInput(label));
+        }
+        let minimum = OCCT_REFERENCE_MIN_FEATURE.max(modeling_tolerance);
+        if value <= minimum {
+            return Err(GeometryError::InvalidInput(
+                "geometry feature is below the reference backend resolution",
+            ));
+        }
+        Ok(())
+    }
+
     fn validate_dimensions(
         width: f64,
         depth: f64,
         height: f64,
         modeling_tolerance: f64,
     ) -> Result<(), GeometryError> {
-        if !width.is_finite() || !depth.is_finite() || !height.is_finite() {
-            return Err(GeometryError::InvalidInput("box dimensions must be finite"));
-        }
-        if width <= 0.0 || depth <= 0.0 || height <= 0.0 {
-            return Err(GeometryError::InvalidInput("box dimensions must be positive"));
-        }
+        Self::validate_positive_feature(width, modeling_tolerance, "box dimensions must be finite and positive")?;
+        Self::validate_positive_feature(depth, modeling_tolerance, "box dimensions must be finite and positive")?;
+        Self::validate_positive_feature(height, modeling_tolerance, "box dimensions must be finite and positive")?;
+        Ok(())
+    }
 
-        let minimum_edge = OCCT_REFERENCE_MIN_BOX_EDGE.max(modeling_tolerance);
-        if width <= minimum_edge || depth <= minimum_edge || height <= minimum_edge {
-            return Err(GeometryError::InvalidInput(
-                "box dimensions are below the reference backend resolution",
-            ));
-        }
+    fn validate_cylinder(
+        radius: f64,
+        height: f64,
+        modeling_tolerance: f64,
+    ) -> Result<(), GeometryError> {
+        Self::validate_positive_feature(radius, modeling_tolerance, "cylinder radius must be finite and positive")?;
+        Self::validate_positive_feature(height, modeling_tolerance, "cylinder height must be finite and positive")?;
         Ok(())
     }
 
@@ -177,10 +194,34 @@ impl GeometryBackend for OcctBackend {
 
         let raw = NonNull::new(output)
             .ok_or(GeometryError::Unsupported("OCCT returned a null shape"))?;
-        let shape = OcctShape { raw };
 
         Ok(GeometryResult {
-            shape,
+            shape: OcctShape { raw },
+            kind: GeometryKind::Solid,
+            evidence: self.evidence(GeometryStatus::Success, tolerance, None),
+        })
+    }
+
+    fn cylinder_solid(
+        &self,
+        radius: f64,
+        height: f64,
+        tolerance: ToleranceContext,
+    ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
+        tolerance.validate()?;
+        Self::validate_cylinder(radius, height, tolerance.modeling)?;
+
+        let mut output = std::ptr::null_mut();
+        let status = unsafe { umlcad_occt_cylinder(radius, height, &mut output) };
+        if status != OCCT_OK {
+            return Err(Self::map_status(status, "OCCT cylinder construction failed"));
+        }
+
+        let raw = NonNull::new(output)
+            .ok_or(GeometryError::Unsupported("OCCT returned a null shape"))?;
+
+        Ok(GeometryResult {
+            shape: OcctShape { raw },
             kind: GeometryKind::Solid,
             evidence: self.evidence(GeometryStatus::Success, tolerance, None),
         })
@@ -355,6 +396,78 @@ mod tests {
             manifold: true,
             message: None,
         });
+    }
+
+    #[test]
+    fn valid_cylinder_is_constructed_and_validated() {
+        let backend = OcctBackend::new();
+        let result = backend.cylinder_solid(5.0, 20.0, TOLERANCE).unwrap();
+        assert_eq!(result.kind, GeometryKind::Solid);
+        assert_eq!(result.evidence.status, GeometryStatus::Success);
+        assert_eq!(backend.validate(&result.shape, TOLERANCE).unwrap(), ValidationResult {
+            valid: true,
+            manifold: true,
+            message: None,
+        });
+    }
+
+    #[test]
+    fn cylinder_topology_counts_match_occt_analytic_primitive() {
+        let backend = OcctBackend::new();
+        let shape = backend.cylinder_solid(5.0, 20.0, TOLERANCE).unwrap().shape;
+        assert_eq!(backend.topology_counts(&shape, TOLERANCE).unwrap(), TopologyCounts {
+            solids: 1,
+            shells: 1,
+            faces: 3,
+            edges: 3,
+            vertices: 2,
+        });
+    }
+
+    #[test]
+    fn cylinder_bounding_box_matches_geometry() {
+        let backend = OcctBackend::new();
+        let shape = backend.cylinder_solid(5.0, 20.0, TOLERANCE).unwrap().shape;
+        let bounds = backend.bounding_box(&shape, TOLERANCE).unwrap();
+        assert_close(bounds.min_x, -5.0);
+        assert_close(bounds.min_y, -5.0);
+        assert_close(bounds.min_z, 0.0);
+        assert_close(bounds.max_x, 5.0);
+        assert_close(bounds.max_y, 5.0);
+        assert_close(bounds.max_z, 20.0);
+    }
+
+    #[test]
+    fn invalid_cylinder_dimensions_are_rejected_before_ffi() {
+        let backend = OcctBackend::new();
+        for dimensions in [
+            (0.0, 20.0),
+            (-1.0, 20.0),
+            (5.0, 0.0),
+            (5.0, -1.0),
+            (f64::NAN, 20.0),
+            (5.0, f64::INFINITY),
+            (f64::INFINITY, 20.0),
+            (5.0, f64::NAN),
+        ] {
+            match backend.cylinder_solid(dimensions.0, dimensions.1, TOLERANCE) {
+                Err(GeometryError::InvalidInput(_)) => {}
+                Err(err) => panic!("unexpected cylinder error: {err:?}"),
+                Ok(_) => panic!("invalid cylinder unexpectedly succeeded"),
+            }
+        }
+    }
+
+    #[test]
+    fn cylinder_reference_resolution_is_enforced() {
+        let backend = OcctBackend::new();
+        for radius in [1e-12, 1e-8, 1e-7, 1e-6] {
+            match backend.cylinder_solid(radius, 2.0, TOLERANCE) {
+                Err(GeometryError::InvalidInput(_)) => {}
+                Err(err) => panic!("unexpected radius-resolution error: {err:?}"),
+                Ok(_) => panic!("radius {radius:e} unexpectedly succeeded"),
+            }
+        }
     }
 
     #[test]
