@@ -8,7 +8,9 @@
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Shape.hxx>
 #include <gp_Ax1.hxx>
@@ -40,6 +42,28 @@ bool isFiniteValue(double value) {
 bool finiteAxis(double x, double y, double z) {
     return isFiniteValue(x) && isFiniteValue(y) && isFiniteValue(z)
         && (x != 0.0 || y != 0.0 || z != 0.0);
+}
+
+bool solidBoundaryIsEdgeManifold(const TopoDS_Shape& shape) {
+    if (!hasSolid(shape)) {
+        return false;
+    }
+
+    TopTools_IndexedDataMapOfShapeListOfShape edge_to_faces;
+    TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_to_faces);
+
+    if (edge_to_faces.IsEmpty()) {
+        return false;
+    }
+
+    for (int index = 1; index <= edge_to_faces.Extent(); ++index) {
+        const TopTools_ListOfShape& incident_faces = edge_to_faces.FindFromIndex(index);
+        if (incident_faces.Extent() != 2) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 }
@@ -291,7 +315,7 @@ extern "C" int32_t umlcad_occt_shape_validate(
 
         const BRepCheck_Analyzer analyzer(input->value, true);
         *valid = analyzer.IsValid() ? 1 : 0;
-        *manifold = hasSolid(input->value) ? 1 : 0;
+        *manifold = solidBoundaryIsEdgeManifold(input->value) ? 1 : 0;
         return UMLCAD_OCCT_OK;
     } catch (...) {
         return UMLCAD_OCCT_INTERNAL_ERROR;
