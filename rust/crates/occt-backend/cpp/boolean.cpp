@@ -3,6 +3,9 @@
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
+#include <TopAbs_ShapeEnum.hxx>
+#include <TopExp.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS_Shape.hxx>
 
 #include <new>
@@ -12,6 +15,13 @@ struct umlcad_occt_shape {
 };
 
 namespace {
+
+bool hasSolid(const TopoDS_Shape& shape) {
+    TopTools_IndexedMapOfShape solids;
+    TopExp::MapShapes(shape, TopAbs_SOLID, solids);
+    return !solids.IsEmpty();
+}
+
 int32_t runBoolean(const TopoDS_Shape& left, const TopoDS_Shape& right, TopoDS_Shape& result, int operation) {
     switch (operation) {
         case 0: {
@@ -38,7 +48,14 @@ int32_t runBoolean(const TopoDS_Shape& left, const TopoDS_Shape& right, TopoDS_S
         default:
             return UMLCAD_OCCT_INVALID_ARGUMENT;
     }
-    return result.IsNull() ? UMLCAD_OCCT_CONSTRUCTION_FAILED : UMLCAD_OCCT_OK;
+
+    // The current UMLCAD Boolean contract returns volumetric B-Rep solids.
+    // Empty common/cut results cannot be represented as GeometryKind::Solid,
+    // so they are rejected explicitly rather than returned as invalid geometry.
+    if (result.IsNull() || !hasSolid(result)) {
+        return UMLCAD_OCCT_CONSTRUCTION_FAILED;
+    }
+    return UMLCAD_OCCT_OK;
 }
 
 int32_t booleanOperation(const umlcad_occt_shape* left, const umlcad_occt_shape* right, umlcad_occt_shape** out_shape, int operation) {
