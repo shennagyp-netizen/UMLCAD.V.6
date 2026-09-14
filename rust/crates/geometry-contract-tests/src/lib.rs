@@ -1,5 +1,5 @@
 //! Contract tests shared by every V6 geometry backend.
-//! These tests intentionally describe behavior before the OCCT implementation exists.
+//! These tests define behavior independently of backend implementation details.
 
 use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, ToleranceContext, ValidationResult};
 
@@ -33,7 +33,7 @@ pub fn assert_translation_preserves_validation<B: GeometryBackend>(backend: &B) 
         .shape;
 
     let translated = backend
-        .translate(&solid, 1000.0, -2000.0, 3000.0)
+        .translate(&solid, 1000.0, -2000.0, 3000.0, tolerance)
         .expect("translation should succeed")
         .shape;
 
@@ -55,13 +55,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "RED: becomes active when the first OCCT primitive is implemented"]
     fn occt_box_contract() {
         assert_box_requires_positive_dimensions(&OcctBackend::new());
     }
 
     #[test]
-    #[ignore = "RED: becomes active when the first OCCT primitive is implemented"]
     fn occt_translation_validation_contract() {
         assert_translation_preserves_validation(&OcctBackend::new());
     }
