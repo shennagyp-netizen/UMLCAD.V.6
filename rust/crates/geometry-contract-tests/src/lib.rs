@@ -106,6 +106,48 @@ pub fn assert_translation_preserves_validation<B: GeometryBackend>(backend: &B) 
     assert_eq!(after, before);
 }
 
+pub fn assert_rotation_preserves_validation<B: GeometryBackend>(backend: &B) {
+    let solid = backend
+        .box_solid(10.0, 20.0, 30.0, TOLERANCE)
+        .expect("box construction should succeed")
+        .shape;
+
+    for angle in [0.0, core::f64::consts::FRAC_PI_2, core::f64::consts::PI] {
+        let rotated = backend
+            .rotate(&solid, 0.0, 0.0, 1.0, angle, TOLERANCE)
+            .unwrap_or_else(|error| panic!("rotation failed for angle {angle}: {error}"));
+        assert_eq!(rotated.kind, umlcad_v6_geometry_api::GeometryKind::Solid);
+        assert_eq!(rotated.evidence.tolerance, TOLERANCE);
+        assert_eq!(
+            backend.validate(&rotated.shape, TOLERANCE).unwrap(),
+            ValidationResult {
+                valid: true,
+                manifold: true,
+                message: None,
+            }
+        );
+    }
+}
+
+pub fn assert_invalid_rotation_is_rejected<B: GeometryBackend>(backend: &B) {
+    let solid = backend
+        .box_solid(10.0, 20.0, 30.0, TOLERANCE)
+        .expect("box construction should succeed")
+        .shape;
+
+    for input in [
+        (0.0, 0.0, 0.0, 0.0),
+        (0.0, 0.0, 1.0, f64::NAN),
+        (f64::INFINITY, 0.0, 1.0, 0.0),
+    ] {
+        match backend.rotate(&solid, input.0, input.1, input.2, input.3, TOLERANCE) {
+            Err(GeometryError::InvalidInput(_)) => {}
+            Err(other) => panic!("unexpected rotation error: {other}"),
+            Ok(_) => panic!("invalid rotation unexpectedly succeeded"),
+        }
+    }
+}
+
 pub fn assert_deterministic_validation<B: GeometryBackend>(backend: &B) {
     let mut reference = None;
     for _ in 0..32 {
@@ -156,6 +198,16 @@ mod tests {
     #[test]
     fn occt_translation_validation_contract() {
         assert_translation_preserves_validation(&OcctBackend::new());
+    }
+
+    #[test]
+    fn occt_rotation_validation_contract() {
+        assert_rotation_preserves_validation(&OcctBackend::new());
+    }
+
+    #[test]
+    fn occt_invalid_rotation_contract() {
+        assert_invalid_rotation_is_rejected(&OcctBackend::new());
     }
 
     #[test]
