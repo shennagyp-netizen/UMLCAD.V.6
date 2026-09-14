@@ -1,7 +1,7 @@
 use umlcad_v6_geometry_api::{FaceDescriptor,GeometryBackend,ReferenceResolution, ToleranceContext};
 use umlcad_v6_occt_backend::OcctBackend;
 
-const T: ToleranceContext = ToleranceContext { modeling: 1e-9, validation: 1e-9 };
+const T: ToleranceContext = ToleranceContext { modeling: 1e-9, validation: 1e-6 };
 
 fn bottom_face(descriptors: &[FaceDescriptor]) -> FaceDescriptor {
     descriptors.iter().find(|d| d.bounds.min_z == 0.0 && d.bounds.max_z == 0.0).copied().unwrap()
@@ -16,9 +16,28 @@ fn unique_geometric_face_query_resolves_without_traversal_identity() {
 
     let resolution = backend.resolve_face_descriptor(&shape, &query, T).unwrap();
     match resolution {
-        ReferenceResolution::Unique(found) => assert_eq!(found, query),
+        ReferenceResolution::Unique(found) => assert!(found.matches_within(query, T.validation)),
         other => panic!("expected unique geometric resolution, got {other:?}"),
     }
+}
+
+#[test]
+fn tolerance_small_geometric_change_still_resolves_but_large_change_does_not() {
+    let backend = OcctBackend::new();
+    let shape = backend.box_solid(20.0, 20.0, 20.0, T).unwrap().shape;
+    let original = bottom_face(&backend.face_descriptors(&shape, T).unwrap());
+
+    let near = FaceDescriptor { area: original.area * (1.0 + 5e-7), ..original };
+    assert!(matches!(
+        backend.resolve_face_descriptor(&shape, &near, T).unwrap(),
+        ReferenceResolution::Unique(_)
+    ));
+
+    let far = FaceDescriptor { area: original.area * (1.0 + 5e-4), ..original };
+    assert_eq!(
+        backend.resolve_face_descriptor(&shape, &far, T).unwrap(),
+        ReferenceResolution::NotFound
+    );
 }
 
 #[test]
