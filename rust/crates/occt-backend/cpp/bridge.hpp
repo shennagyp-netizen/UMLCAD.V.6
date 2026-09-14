@@ -34,6 +34,14 @@ int32_t umlcad_occt_shape_translate(
     double dz,
     umlcad_occt_shape** out_shape);
 
+int32_t umlcad_occt_shape_rotate(
+    const umlcad_occt_shape* input,
+    double axis_x,
+    double axis_y,
+    double axis_z,
+    double angle_radians,
+    umlcad_occt_shape** out_shape);
+
 int32_t umlcad_occt_shape_validate(
     const umlcad_occt_shape* input,
     int32_t* valid,
