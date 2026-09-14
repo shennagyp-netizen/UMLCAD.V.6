@@ -235,6 +235,44 @@ extern "C" int32_t umlcad_occt_shape_bounding_box(
     }
 }
 
+extern "C" int32_t umlcad_occt_shape_topology_counts(
+    const umlcad_occt_shape* input,
+    uint32_t* out_counts) {
+    if (input == nullptr || out_counts == nullptr) {
+        return UMLCAD_OCCT_INVALID_ARGUMENT;
+    }
+
+    for (int index = 0; index < 5; ++index) {
+        out_counts[index] = 0;
+    }
+
+    try {
+        if (input->value.IsNull()) {
+            return UMLCAD_OCCT_NULL_SHAPE;
+        }
+
+        const TopAbs_ShapeEnum kinds[] = {
+            TopAbs_SOLID,
+            TopAbs_SHELL,
+            TopAbs_FACE,
+            TopAbs_EDGE,
+            TopAbs_VERTEX,
+        };
+
+        for (int index = 0; index < 5; ++index) {
+            uint32_t count = 0;
+            for (TopExp_Explorer explorer(input->value, kinds[index]); explorer.More(); explorer.Next()) {
+                ++count;
+            }
+            out_counts[index] = count;
+        }
+
+        return UMLCAD_OCCT_OK;
+    } catch (...) {
+        return UMLCAD_OCCT_INTERNAL_ERROR;
+    }
+}
+
 extern "C" int32_t umlcad_occt_shape_validate(
     const umlcad_occt_shape* input,
     int32_t* valid,
