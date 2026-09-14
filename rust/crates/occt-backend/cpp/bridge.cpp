@@ -115,8 +115,7 @@ extern "C" int32_t umlcad_occt_cylinder(
     }
 
     try {
-        const gp_Ax2 axis(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(0.0, 0.0, 1.0));
-        const TopoDS_Shape cylinder = BRepPrimAPI_MakeCylinder(axis, radius, height).Shape();
+        const TopoDS_Shape cylinder = BRepPrimAPI_MakeCylinder(radius, height).Shape();
         if (cylinder.IsNull()) {
             return UMLCAD_OCCT_CONSTRUCTION_FAILED;
         }
