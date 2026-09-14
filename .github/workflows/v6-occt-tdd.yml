@@ -1,0 +1,51 @@
+name: V6 OCCT TDD
+
+on:
+  push:
+    branches:
+      - v6-occt-tdd
+  pull_request:
+    branches:
+      - main
+      - v6-occt-tdd
+
+jobs:
+  rust-occt:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install OCCT and build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            libocct-foundation-dev \
+            libocct-modeling-data-dev \
+            libocct-modeling-algorithms-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.1
+          components: rustfmt, clippy
+
+      - name: Format gate
+        working-directory: rust
+        run: cargo fmt --all --check
+
+      - name: Test gate (debug)
+        working-directory: rust
+        run: cargo test --workspace --all-targets
+
+      - name: Test gate (release)
+        working-directory: rust
+        run: cargo test --workspace --all-targets --release
+
+      - name: Clippy gate
+        working-directory: rust
+        run: cargo clippy --workspace --all-targets -- -D warnings
