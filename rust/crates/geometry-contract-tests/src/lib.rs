@@ -171,6 +171,75 @@ pub fn assert_translation_and_rotation_change_bounds_predictably<B: GeometryBack
     );
 }
 
+pub fn assert_transform_algebra<B: GeometryBackend>(backend: &B) {
+    let solid = backend
+        .box_solid(10.0, 20.0, 30.0, TOLERANCE)
+        .expect("box construction should succeed")
+        .shape;
+
+    // Translation identity.
+    let identity_translation = backend
+        .translate(&solid, 0.0, 0.0, 0.0, TOLERANCE)
+        .expect("zero translation should succeed")
+        .shape;
+    assert_box(
+        backend.bounding_box(&identity_translation, TOLERANCE).unwrap(),
+        backend.bounding_box(&solid, TOLERANCE).unwrap(),
+    );
+
+    // Translation composition: T(a) then T(b) == T(a+b).
+    let first = backend
+        .translate(&solid, 11.0, -7.0, 3.0, TOLERANCE)
+        .expect("first translation should succeed")
+        .shape;
+    let sequential = backend
+        .translate(&first, -4.0, 9.0, 8.0, TOLERANCE)
+        .expect("second translation should succeed")
+        .shape;
+    let direct = backend
+        .translate(&solid, 7.0, 2.0, 11.0, TOLERANCE)
+        .expect("composed translation should succeed")
+        .shape;
+    assert_box(
+        backend.bounding_box(&sequential, TOLERANCE).unwrap(),
+        backend.bounding_box(&direct, TOLERANCE).unwrap(),
+    );
+
+    // Zero-angle rotation is identity.
+    let identity_rotation = backend
+        .rotate(&solid, 0.0, 0.0, 1.0, 0.0, TOLERANCE)
+        .expect("zero-angle rotation should succeed")
+        .shape;
+    assert_box(
+        backend.bounding_box(&identity_rotation, TOLERANCE).unwrap(),
+        backend.bounding_box(&solid, TOLERANCE).unwrap(),
+    );
+
+    // A full revolution is identity for the measured geometry.
+    let full_rotation = backend
+        .rotate(
+            &solid,
+            0.0,
+            0.0,
+            1.0,
+            2.0 * core::f64::consts::PI,
+            TOLERANCE,
+        )
+        .expect("full rotation should succeed")
+        .shape;
+    assert_box(
+        backend.bounding_box(&full_rotation, TOLERANCE).unwrap(),
+        backend.bounding_box(&solid, TOLERANCE).unwrap(),
+    );
+
+    // Transform algebra must preserve validation.
+    assert_eq!(backend.validate(&sequential, TOLERANCE).unwrap(), ValidationResult {
+        valid: true,
+        manifold: true,
+        message: None,
+    });
+}
+
 pub fn assert_translation_preserves_validation<B: GeometryBackend>(backend: &B) {
     let solid = backend
         .box_solid(10.0, 20.0, 30.0, TOLERANCE)
@@ -290,6 +359,11 @@ mod tests {
     #[test]
     fn occt_transform_measurement_contract() {
         assert_translation_and_rotation_change_bounds_predictably(&OcctBackend::new());
+    }
+
+    #[test]
+    fn occt_transform_algebra_contract() {
+        assert_transform_algebra(&OcctBackend::new());
     }
 
     #[test]
