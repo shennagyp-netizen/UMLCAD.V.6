@@ -42,6 +42,10 @@ int32_t umlcad_occt_shape_rotate(
     double angle_radians,
     umlcad_occt_shape** out_shape);
 
+int32_t umlcad_occt_shape_bounding_box(
+    const umlcad_occt_shape* input,
+    double* out_bounds);
+
 int32_t umlcad_occt_shape_validate(
     const umlcad_occt_shape* input,
     int32_t* valid,
