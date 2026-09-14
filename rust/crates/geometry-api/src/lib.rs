@@ -113,6 +113,13 @@ pub trait GeometryBackend {
         tolerance: ToleranceContext,
     ) -> Result<GeometryResult<Self::Shape>, GeometryError>;
 
+    fn cylinder_solid(
+        &self,
+        radius: f64,
+        height: f64,
+        tolerance: ToleranceContext,
+    ) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+
     fn translate(
         &self,
         shape: &Self::Shape,
