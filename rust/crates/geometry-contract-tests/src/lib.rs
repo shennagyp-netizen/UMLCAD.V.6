@@ -16,7 +16,9 @@ pub fn assert_box_requires_positive_dimensions<B: GeometryBackend>(backend: &B) 
     let result = backend.box_solid(0.0, 20.0, 30.0, tolerance);
     match result {
         Err(GeometryError::InvalidInput(_)) => {}
-        other => panic!("expected InvalidInput for zero width, got {other:?}"),
+        Err(GeometryError::Unsupported(_)) => panic!("backend does not yet implement this contract"),
+        Err(other) => panic!("unexpected geometry error: {other}"),
+        Ok(_) => panic!("zero-width box unexpectedly succeeded"),
     }
 }
 
