@@ -2,7 +2,7 @@ use std::ptr::NonNull;
 
 use umlcad_v6_geometry_api::{
     BoundingBox, GeometryBackend, GeometryError, GeometryEvidence, GeometryKind, GeometryResult,
-    GeometryStatus, ToleranceContext, ValidationResult,
+    GeometryStatus, ToleranceContext, TopologyCounts, ValidationResult,
 };
 
 #[repr(C)]
@@ -29,6 +29,7 @@ unsafe extern "C" {
         out_shape: *mut *mut NativeShape,
     ) -> i32;
     fn umlcad_occt_shape_bounding_box(input: *const NativeShape, out_bounds: *mut f64) -> i32;
+    fn umlcad_occt_shape_topology_counts(input: *const NativeShape, out_counts: *mut u32) -> i32;
     fn umlcad_occt_shape_validate(input: *const NativeShape, valid: *mut i32, manifold: *mut i32) -> i32;
     fn umlcad_occt_shape_delete(shape: *mut NativeShape);
 }
@@ -276,6 +277,30 @@ impl GeometryBackend for OcctBackend {
         Ok(bounds)
     }
 
+    fn topology_counts(
+        &self,
+        shape: &Self::Shape,
+        tolerance: ToleranceContext,
+    ) -> Result<TopologyCounts, GeometryError> {
+        tolerance.validate()?;
+
+        let mut values = [0_u32; 5];
+        let status = unsafe {
+            umlcad_occt_shape_topology_counts(shape.raw.as_ptr(), values.as_mut_ptr())
+        };
+        if status != OCCT_OK {
+            return Err(Self::map_status(status, "OCCT topology-count measurement failed"));
+        }
+
+        Ok(TopologyCounts {
+            solids: values[0],
+            shells: values[1],
+            faces: values[2],
+            edges: values[3],
+            vertices: values[4],
+        })
+    }
+
     fn validate(
         &self,
         shape: &Self::Shape,
@@ -329,6 +354,19 @@ mod tests {
             valid: true,
             manifold: true,
             message: None,
+        });
+    }
+
+    #[test]
+    fn topology_counts_match_occt_box() {
+        let backend = OcctBackend::new();
+        let shape = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
+        assert_eq!(backend.topology_counts(&shape, TOLERANCE).unwrap(), TopologyCounts {
+            solids: 1,
+            shells: 1,
+            faces: 6,
+            edges: 12,
+            vertices: 8,
         });
     }
 
