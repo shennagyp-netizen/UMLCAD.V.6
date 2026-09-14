@@ -6,7 +6,9 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <TopAbs_ShapeEnum.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Shape.hxx>
 #include <gp_Ax1.hxx>
@@ -260,11 +262,9 @@ extern "C" int32_t umlcad_occt_shape_topology_counts(
         };
 
         for (int index = 0; index < 5; ++index) {
-            uint32_t count = 0;
-            for (TopExp_Explorer explorer(input->value, kinds[index]); explorer.More(); explorer.Next()) {
-                ++count;
-            }
-            out_counts[index] = count;
+            TopTools_IndexedMapOfShape unique_shapes;
+            TopExp::MapShapes(input->value, kinds[index], unique_shapes);
+            out_counts[index] = static_cast<uint32_t>(unique_shapes.Extent());
         }
 
         return UMLCAD_OCCT_OK;
