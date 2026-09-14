@@ -1,4 +1,3 @@
-use std::ffi::c_void;
 use std::ptr::NonNull;
 
 use umlcad_v6_geometry_api::{
@@ -12,18 +11,8 @@ struct NativeShape {
 }
 
 unsafe extern "C" {
-    fn umlcad_occt_box(
-        width: f64,
-        depth: f64,
-        height: f64,
-        out_shape: *mut *mut NativeShape,
-    ) -> i32;
-
-    fn umlcad_occt_shape_clone(
-        input: *const NativeShape,
-        out_shape: *mut *mut NativeShape,
-    ) -> i32;
-
+    fn umlcad_occt_box(width: f64, depth: f64, height: f64, out_shape: *mut *mut NativeShape) -> i32;
+    fn umlcad_occt_shape_clone(input: *const NativeShape, out_shape: *mut *mut NativeShape) -> i32;
     fn umlcad_occt_shape_translate(
         input: *const NativeShape,
         dx: f64,
@@ -31,13 +20,7 @@ unsafe extern "C" {
         dz: f64,
         out_shape: *mut *mut NativeShape,
     ) -> i32;
-
-    fn umlcad_occt_shape_validate(
-        input: *const NativeShape,
-        valid: *mut i32,
-        manifold: *mut i32,
-    ) -> i32;
-
+    fn umlcad_occt_shape_validate(input: *const NativeShape, valid: *mut i32, manifold: *mut i32) -> i32;
     fn umlcad_occt_shape_delete(shape: *mut NativeShape);
 }
 
@@ -103,7 +86,12 @@ impl OcctBackend {
         }
     }
 
-    fn evidence(&self, status: GeometryStatus, tolerance: ToleranceContext, message: Option<String>) -> GeometryEvidence {
+    fn evidence(
+        &self,
+        status: GeometryStatus,
+        tolerance: ToleranceContext,
+        message: Option<String>,
+    ) -> GeometryEvidence {
         GeometryEvidence {
             status,
             backend: self.backend_name(),
@@ -142,7 +130,8 @@ impl GeometryBackend for OcctBackend {
             return Err(Self::map_status(status, "OCCT box construction failed"));
         }
 
-        let raw = NonNull::new(output).ok_or(GeometryError::Unsupported("OCCT returned a null shape"))?;
+        let raw = NonNull::new(output)
+            .ok_or(GeometryError::Unsupported("OCCT returned a null shape"))?;
         let shape = OcctShape { raw };
 
         Ok(GeometryResult {
@@ -158,7 +147,9 @@ impl GeometryBackend for OcctBackend {
         dx: f64,
         dy: f64,
         dz: f64,
+        tolerance: ToleranceContext,
     ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
+        tolerance.validate()?;
         Self::validate_translation(dx, dy, dz)?;
 
         let mut output = std::ptr::null_mut();
@@ -169,18 +160,12 @@ impl GeometryBackend for OcctBackend {
             return Err(Self::map_status(status, "OCCT translation failed"));
         }
 
-        let raw = NonNull::new(output).ok_or(GeometryError::Unsupported("OCCT returned a null shape"))?;
+        let raw = NonNull::new(output)
+            .ok_or(GeometryError::Unsupported("OCCT returned a null shape"))?;
         Ok(GeometryResult {
             shape: OcctShape { raw },
             kind: GeometryKind::Solid,
-            evidence: self.evidence(
-                GeometryStatus::Success,
-                ToleranceContext {
-                    modeling: 0.0,
-                    validation: 0.0,
-                },
-                None,
-            ),
+            evidence: self.evidence(GeometryStatus::Success, tolerance, None),
         })
     }
 
@@ -228,6 +213,7 @@ mod tests {
         let result = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap();
         assert_eq!(result.kind, GeometryKind::Solid);
         assert_eq!(result.evidence.status, GeometryStatus::Success);
+        assert_eq!(result.evidence.tolerance, TOLERANCE);
         assert_eq!(backend.validate(&result.shape, TOLERANCE).unwrap(), ValidationResult {
             valid: true,
             manifold: true,
@@ -256,7 +242,7 @@ mod tests {
         let backend = OcctBackend::new();
         let shape = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
         for translation in [(f64::NAN, 0.0, 0.0), (0.0, f64::INFINITY, 0.0)] {
-            match backend.translate(&shape, translation.0, translation.1, translation.2) {
+            match backend.translate(&shape, translation.0, translation.1, translation.2, TOLERANCE) {
                 Err(GeometryError::InvalidInput(_)) => {}
                 other => panic!("unexpected translation result: {other:?}"),
             }
@@ -267,14 +253,17 @@ mod tests {
     fn translation_returns_new_valid_shape_and_preserves_source() {
         let backend = OcctBackend::new();
         let source = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
-        let translated = backend.translate(&source, 1000.0, -2000.0, 3000.0).unwrap().shape;
+        let translated = backend
+            .translate(&source, 1000.0, -2000.0, 3000.0, TOLERANCE)
+            .unwrap();
 
+        assert_eq!(translated.evidence.tolerance, TOLERANCE);
         assert_eq!(backend.validate(&source, TOLERANCE).unwrap(), ValidationResult {
             valid: true,
             manifold: true,
             message: None,
         });
-        assert_eq!(backend.validate(&translated, TOLERANCE).unwrap(), ValidationResult {
+        assert_eq!(backend.validate(&translated.shape, TOLERANCE).unwrap(), ValidationResult {
             valid: true,
             manifold: true,
             message: None,
@@ -287,6 +276,6 @@ mod tests {
         let original = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
         let clone = original.clone();
         drop(original);
-        assert_eq!(backend.validate(&clone, TOLERANCE).unwrap().valid, true);
+        assert!(backend.validate(&clone, TOLERANCE).unwrap().valid);
     }
 }
