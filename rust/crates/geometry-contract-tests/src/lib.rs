@@ -33,6 +33,16 @@ pub fn assert_box_requires_positive_dimensions<B: GeometryBackend>(backend: &B) 
     }
 }
 
+pub fn assert_sub_modeling_tolerance_dimensions_are_rejected<B: GeometryBackend>(backend: &B) {
+    for edge in [1e-12, 5e-10, 1e-9] {
+        match backend.box_solid(edge, edge * 2.0, edge * 3.0, TOLERANCE) {
+            Err(GeometryError::InvalidInput(_)) => {}
+            Err(other) => panic!("unexpected error below modeling resolution at {edge:e}: {other}"),
+            Ok(_) => panic!("dimension {edge:e} at/below modeling tolerance unexpectedly succeeded"),
+        }
+    }
+}
+
 pub fn assert_invalid_tolerance_is_rejected<B: GeometryBackend>(backend: &B) {
     let invalid = [
         ToleranceContext {
@@ -59,13 +69,13 @@ pub fn assert_invalid_tolerance_is_rejected<B: GeometryBackend>(backend: &B) {
 }
 
 pub fn assert_numeric_scale_survives_validation<B: GeometryBackend>(backend: &B) {
-    for edge in [1e-12, 1e-9, 1e-6, 1e3, 1e6] {
+    for edge in [1e-8, 1e-6, 1e3, 1e6] {
         let result = backend
             .box_solid(edge, edge * 2.0, edge * 3.0, TOLERANCE)
-            .unwrap_or_else(|error| panic!("failed scale {edge:e}: {error}"));
+            .unwrap_or_else(|error| panic!("failed supported scale {edge:e}: {error}"));
         let validation = backend
             .validate(&result.shape, TOLERANCE)
-            .unwrap_or_else(|error| panic!("validation failed at scale {edge:e}: {error}"));
+            .unwrap_or_else(|error| panic!("validation failed at supported scale {edge:e}: {error}"));
         assert_eq!(validation, ValidationResult {
             valid: true,
             manifold: true,
@@ -126,6 +136,11 @@ mod tests {
     #[test]
     fn occt_box_contract() {
         assert_box_requires_positive_dimensions(&OcctBackend::new());
+    }
+
+    #[test]
+    fn occt_sub_modeling_tolerance_contract() {
+        assert_sub_modeling_tolerance_dimensions_are_rejected(&OcctBackend::new());
     }
 
     #[test]
