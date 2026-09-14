@@ -46,6 +46,10 @@ int32_t umlcad_occt_shape_bounding_box(
     const umlcad_occt_shape* input,
     double* out_bounds);
 
+int32_t umlcad_occt_shape_topology_counts(
+    const umlcad_occt_shape* input,
+    uint32_t* out_counts);
+
 int32_t umlcad_occt_shape_validate(
     const umlcad_occt_shape* input,
     int32_t* valid,
