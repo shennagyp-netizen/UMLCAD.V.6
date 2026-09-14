@@ -42,3 +42,9 @@ set_target_properties(umlcad_occt_bridge PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+
+install(
+    TARGETS umlcad_occt_bridge
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
