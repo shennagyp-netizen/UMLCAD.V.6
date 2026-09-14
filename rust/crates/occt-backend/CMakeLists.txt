@@ -12,6 +12,7 @@ add_library(umlcad_occt_bridge SHARED
     cpp/cone.cpp
     cpp/boolean.cpp
     cpp/extrusion.cpp
+    cpp/revolution.cpp
 )
 
 target_include_directories(umlcad_occt_bridge
