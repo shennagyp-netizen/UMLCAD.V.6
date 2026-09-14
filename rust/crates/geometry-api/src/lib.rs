@@ -1,22 +1,311 @@
 use core::fmt;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)] pub enum GeometryStatus { Success, InvalidInput, BackendFailure, TopologyInvalid, Ambiguous, Indeterminate, Unsupported }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)] pub enum GeometryKind { Solid, Surface, Curve }
-#[derive(Clone, Copy, Debug, PartialEq)] pub struct ToleranceContext { pub modeling:f64, pub validation:f64 }
-impl ToleranceContext { pub fn validate(self)->Result<(),GeometryError>{if !self.modeling.is_finite()||!self.validation.is_finite(){return Err(GeometryError::InvalidTolerance)} if self.modeling<0.0||self.validation<0.0{return Err(GeometryError::InvalidTolerance)} Ok(())} }
-#[derive(Clone, Copy, Debug, PartialEq)] pub struct BoundingBox{pub min_x:f64,pub min_y:f64,pub min_z:f64,pub max_x:f64,pub max_y:f64,pub max_z:f64}
-impl BoundingBox{pub fn validate(self)->Result<(),GeometryError>{let v=[self.min_x,self.min_y,self.min_z,self.max_x,self.max_y,self.max_z];if v.iter().any(|x|!x.is_finite()){return Err(GeometryError::InvalidInput("bounding box contains non-finite values"))} if self.min_x>self.max_x||self.min_y>self.max_y||self.min_z>self.max_z{return Err(GeometryError::InvalidInput("bounding box minimum exceeds maximum"))} Ok(())}}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)] pub struct TopologyCounts{pub solids:u32,pub shells:u32,pub faces:u32,pub edges:u32,pub vertices:u32}
-#[derive(Clone, Copy, Debug, PartialEq)] pub struct FaceDescriptor{pub area:f64,pub bounds:BoundingBox,pub boundary_edge_count:u32}
-impl FaceDescriptor{pub fn validate(self)->Result<(),GeometryError>{if !self.area.is_finite()||self.area<0.0{return Err(GeometryError::InvalidInput("face descriptor area must be finite and non-negative"))}self.bounds.validate()?;if self.boundary_edge_count==0{return Err(GeometryError::InvalidInput("face descriptor must have at least one boundary edge"))}Ok(())}pub fn matches_within(self,other:Self,tolerance:f64)->bool{if !tolerance.is_finite()||tolerance<0.0||self.boundary_edge_count!=other.boundary_edge_count{return false}fn close(a:f64,b:f64,t:f64)->bool{let scale=a.abs().max(b.abs()).max(1.0);(a-b).abs()<=t*scale}close(self.area,other.area,tolerance)&&close(self.bounds.min_x,other.bounds.min_x,tolerance)&&close(self.bounds.min_y,other.bounds.min_y,tolerance)&&close(self.bounds.min_z,other.bounds.min_z,tolerance)&&close(self.bounds.max_x,other.bounds.max_x,tolerance)&&close(self.bounds.max_y,other.bounds.max_y,tolerance)&&close(self.bounds.max_z,other.bounds.max_z,tolerance)}}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)] pub enum ReferenceResolution<T>{Unique(T),Ambiguous,NotFound}
-#[derive(Clone, Debug, PartialEq)] pub struct GeometryEvidence{pub status:GeometryStatus,pub backend:&'static str,pub tolerance:ToleranceContext,pub message:Option<String>}
-#[derive(Debug, PartialEq)] pub enum GeometryError{InvalidTolerance,InvalidInput(&'static str),Unsupported(&'static str)}
-impl fmt::Display for GeometryError{fn fmt(&self,f:&mut fmt::Formatter<'_>)->fmt::Result{match self{Self::InvalidTolerance=>write!(f,"invalid tolerance context"),Self::InvalidInput(v)=>write!(f,"invalid input: {v}"),Self::Unsupported(v)=>write!(f,"unsupported: {v}")}}}
-
-pub trait GeometryBackend{type Shape:Clone;fn backend_name(&self)->&'static str;fn box_solid(&self,width:f64,depth:f64,height:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn cylinder_solid(&self,radius:f64,height:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn sphere_solid(&self,radius:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn cone_solid(&self,base_radius:f64,top_radius:f64,height:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn extrude_polygon(&self,points:&[(f64,f64)],height:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn revolve_polygon(&self,profile_rz:&[(f64,f64)],angle_radians:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn loft_between_polygons(&self,lower:&[(f64,f64)],lower_z:f64,upper:&[(f64,f64)],upper_z:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn fillet_all_edges(&self,shape:&Self::Shape,radius:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn chamfer_all_edges(&self,shape:&Self::Shape,distance:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn fuse(&self,left:&Self::Shape,right:&Self::Shape,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn common(&self,left:&Self::Shape,right:&Self::Shape,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn cut(&self,left:&Self::Shape,right:&Self::Shape,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn translate(&self,shape:&Self::Shape,dx:f64,dy:f64,dz:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn rotate(&self,shape:&Self::Shape,axis_x:f64,axis_y:f64,axis_z:f64,angle_radians:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;fn bounding_box(&self,shape:&Self::Shape,tolerance:ToleranceContext)->Result<BoundingBox,GeometryError>;fn topology_counts(&self,shape:&Self::Shape,tolerance:ToleranceContext)->Result<TopologyCounts,GeometryError>;fn face_descriptors(&self,shape:&Self::Shape,tolerance:ToleranceContext)->Result<Vec<FaceDescriptor>,GeometryError>;fn resolve_face_descriptor(&self,shape:&Self::Shape,query:&FaceDescriptor,tolerance:ToleranceContext)->Result<ReferenceResolution<FaceDescriptor>,GeometryError>{tolerance.validate()?;query.validate()?;let matches=self.face_descriptors(shape,tolerance)?.into_iter().filter(|candidate|candidate.matches_within(*query,tolerance.validation)).collect::<Vec<_>>();Ok(match matches.as_slice(){[]=>ReferenceResolution::NotFound,[found]=>ReferenceResolution::Unique(*found),_=>ReferenceResolution::Ambiguous})}fn validate(&self,shape:&Self::Shape,tolerance:ToleranceContext)->Result<ValidationResult,GeometryError>;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GeometryStatus {
+    Success,
+    InvalidInput,
+    BackendFailure,
+    TopologyInvalid,
+    Ambiguous,
+    Indeterminate,
+    Unsupported,
 }
-#[derive(Clone, Debug)] pub struct GeometryResult<S>{pub shape:S,pub kind:GeometryKind,pub evidence:GeometryEvidence}
-#[derive(Clone, Debug, PartialEq, Eq)] pub struct ValidationResult{pub valid:bool,pub manifold:bool,pub message:Option<String>}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GeometryKind {
+    Solid,
+    Surface,
+    Curve,
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ToleranceContext {
+    pub modeling: f64,
+    pub validation: f64,
+}
+impl ToleranceContext {
+    pub fn validate(self) -> Result<(), GeometryError> {
+        if !self.modeling.is_finite() || !self.validation.is_finite() {
+            return Err(GeometryError::InvalidTolerance);
+        }
+        if self.modeling < 0.0 || self.validation < 0.0 {
+            return Err(GeometryError::InvalidTolerance);
+        }
+        Ok(())
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BoundingBox {
+    pub min_x: f64,
+    pub min_y: f64,
+    pub min_z: f64,
+    pub max_x: f64,
+    pub max_y: f64,
+    pub max_z: f64,
+}
+impl BoundingBox {
+    pub fn validate(self) -> Result<(), GeometryError> {
+        let values = [
+            self.min_x,
+            self.min_y,
+            self.min_z,
+            self.max_x,
+            self.max_y,
+            self.max_z,
+        ];
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(GeometryError::InvalidInput(
+                "bounding box contains non-finite values",
+            ));
+        }
+        if self.min_x > self.max_x || self.min_y > self.max_y || self.min_z > self.max_z {
+            return Err(GeometryError::InvalidInput(
+                "bounding box minimum exceeds maximum",
+            ));
+        }
+        Ok(())
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TopologyCounts {
+    pub solids: u32,
+    pub shells: u32,
+    pub faces: u32,
+    pub edges: u32,
+    pub vertices: u32,
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FaceDescriptor {
+    pub area: f64,
+    pub bounds: BoundingBox,
+    pub boundary_edge_count: u32,
+}
+impl FaceDescriptor {
+    pub fn validate(self) -> Result<(), GeometryError> {
+        if !self.area.is_finite() || self.area < 0.0 {
+            return Err(GeometryError::InvalidInput(
+                "face descriptor area must be finite and non-negative",
+            ));
+        }
+        self.bounds.validate()?;
+        if self.boundary_edge_count == 0 {
+            return Err(GeometryError::InvalidInput(
+                "face descriptor must have at least one boundary edge",
+            ));
+        }
+        Ok(())
+    }
+    pub fn matches_within(self, other: Self, tolerance: f64) -> bool {
+        if !tolerance.is_finite()
+            || tolerance < 0.0
+            || self.boundary_edge_count != other.boundary_edge_count
+        {
+            return false;
+        }
+        fn close(a: f64, b: f64, tolerance: f64) -> bool {
+            let scale = a.abs().max(b.abs()).max(1.0);
+            (a - b).abs() <= tolerance * scale
+        }
+        close(self.area, other.area, tolerance)
+            && close(self.bounds.min_x, other.bounds.min_x, tolerance)
+            && close(self.bounds.min_y, other.bounds.min_y, tolerance)
+            && close(self.bounds.min_z, other.bounds.min_z, tolerance)
+            && close(self.bounds.max_x, other.bounds.max_x, tolerance)
+            && close(self.bounds.max_y, other.bounds.max_y, tolerance)
+            && close(self.bounds.max_z, other.bounds.max_z, tolerance)
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EdgeDescriptor {
+    pub length: f64,
+    pub bounds: BoundingBox,
+    pub face_use_count: u32,
+    pub vertex_use_count: u32,
+}
+impl EdgeDescriptor {
+    pub fn validate(self) -> Result<(), GeometryError> {
+        if !self.length.is_finite() || self.length < 0.0 {
+            return Err(GeometryError::InvalidInput(
+                "edge descriptor length must be finite and non-negative",
+            ));
+        }
+        self.bounds.validate()?;
+        if self.face_use_count == 0 {
+            return Err(GeometryError::InvalidInput(
+                "edge descriptor must have at least one face use",
+            ));
+        }
+        if self.vertex_use_count == 0 {
+            return Err(GeometryError::InvalidInput(
+                "edge descriptor must have at least one vertex use",
+            ));
+        }
+        Ok(())
+    }
+    pub fn matches_within(self, other: Self, tolerance: f64) -> bool {
+        if !tolerance.is_finite()
+            || tolerance < 0.0
+            || self.face_use_count != other.face_use_count
+            || self.vertex_use_count != other.vertex_use_count
+        {
+            return false;
+        }
+        fn close(a: f64, b: f64, tolerance: f64) -> bool {
+            let scale = a.abs().max(b.abs()).max(1.0);
+            (a - b).abs() <= tolerance * scale
+        }
+        close(self.length, other.length, tolerance)
+            && close(self.bounds.min_x, other.bounds.min_x, tolerance)
+            && close(self.bounds.min_y, other.bounds.min_y, tolerance)
+            && close(self.bounds.min_z, other.bounds.min_z, tolerance)
+            && close(self.bounds.max_x, other.bounds.max_x, tolerance)
+            && close(self.bounds.max_y, other.bounds.max_y, tolerance)
+            && close(self.bounds.max_z, other.bounds.max_z, tolerance)
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReferenceResolution<T> {
+    Unique(T),
+    Ambiguous,
+    NotFound,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct GeometryEvidence {
+    pub status: GeometryStatus,
+    pub backend: &'static str,
+    pub tolerance: ToleranceContext,
+    pub message: Option<String>,
+}
+#[derive(Debug, PartialEq)]
+pub enum GeometryError {
+    InvalidTolerance,
+    InvalidInput(&'static str),
+    Unsupported(&'static str),
+}
+impl fmt::Display for GeometryError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidTolerance => write!(formatter, "invalid tolerance context"),
+            Self::InvalidInput(value) => write!(formatter, "invalid input: {value}"),
+            Self::Unsupported(value) => write!(formatter, "unsupported: {value}"),
+        }
+    }
+}
 
-#[cfg(test)]mod tests{use super::*;#[test]fn tolerance_must_be_finite_and_non_negative(){assert!(ToleranceContext{modeling:0.,validation:1e-9}.validate().is_ok());assert!(ToleranceContext{modeling:1e-9,validation:0.}.validate().is_ok());assert_eq!(ToleranceContext{modeling:-1.,validation:0.}.validate(),Err(GeometryError::InvalidTolerance));assert_eq!(ToleranceContext{modeling:f64::NAN,validation:0.}.validate(),Err(GeometryError::InvalidTolerance));assert_eq!(ToleranceContext{modeling:0.,validation:f64::INFINITY}.validate(),Err(GeometryError::InvalidTolerance));}#[test]fn bounding_box_requires_finite_ordered_extents(){assert!(BoundingBox{min_x:0.,min_y:0.,min_z:0.,max_x:1.,max_y:2.,max_z:3.}.validate().is_ok());assert_eq!(BoundingBox{min_x:f64::NAN,min_y:0.,min_z:0.,max_x:1.,max_y:2.,max_z:3.}.validate(),Err(GeometryError::InvalidInput("bounding box contains non-finite values")));assert_eq!(BoundingBox{min_x:2.,min_y:0.,min_z:0.,max_x:1.,max_y:2.,max_z:3.}.validate(),Err(GeometryError::InvalidInput("bounding box minimum exceeds maximum")));}#[test]fn topology_counts_are_explicit_and_unsigned(){let counts=TopologyCounts{solids:1,shells:1,faces:6,edges:12,vertices:8};assert_eq!(counts.solids,1);assert_eq!(counts.vertices,8);}#[test]fn face_descriptor_requires_finite_non_negative_area_and_valid_bounds(){let descriptor=FaceDescriptor{area:1.,bounds:BoundingBox{min_x:0.,min_y:0.,min_z:0.,max_x:1.,max_y:1.,max_z:0.},boundary_edge_count:4};assert!(descriptor.validate().is_ok());assert_eq!(FaceDescriptor{area:-1.,..descriptor}.validate(),Err(GeometryError::InvalidInput("face descriptor area must be finite and non-negative")));assert_eq!(FaceDescriptor{area:f64::NAN,..descriptor}.validate(),Err(GeometryError::InvalidInput("face descriptor area must be finite and non-negative")));assert_eq!(FaceDescriptor{boundary_edge_count:0,..descriptor}.validate(),Err(GeometryError::InvalidInput("face descriptor must have at least one boundary edge")));}#[test]fn face_descriptor_matching_respects_validation_tolerance(){let a=FaceDescriptor{area:100.,bounds:BoundingBox{min_x:0.,min_y:0.,min_z:0.,max_x:10.,max_y:10.,max_z:0.},boundary_edge_count:4};let b=FaceDescriptor{area:100.00001,bounds:BoundingBox{min_x:0.,min_y:0.,min_z:0.000001,max_x:10.,max_y:10.,max_z:0.000001},boundary_edge_count:4};assert!(a.matches_within(b,1e-6));assert!(!a.matches_within(b,1e-8));}}
+pub trait GeometryBackend {
+    type Shape: Clone;
+    fn backend_name(&self) -> &'static str;
+    fn box_solid(&self, width: f64, depth: f64, height: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn cylinder_solid(&self, radius: f64, height: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn sphere_solid(&self, radius: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn cone_solid(&self, base_radius: f64, top_radius: f64, height: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn extrude_polygon(&self, points: &[(f64, f64)], height: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn revolve_polygon(&self, profile_rz: &[(f64, f64)], angle_radians: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn loft_between_polygons(&self, lower: &[(f64, f64)], lower_z: f64, upper: &[(f64, f64)], upper_z: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn fillet_all_edges(&self, shape: &Self::Shape, radius: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn chamfer_all_edges(&self, shape: &Self::Shape, distance: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn fuse(&self, left: &Self::Shape, right: &Self::Shape, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn common(&self, left: &Self::Shape, right: &Self::Shape, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn cut(&self, left: &Self::Shape, right: &Self::Shape, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn translate(&self, shape: &Self::Shape, dx: f64, dy: f64, dz: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn rotate(&self, shape: &Self::Shape, axis_x: f64, axis_y: f64, axis_z: f64, angle_radians: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn bounding_box(&self, shape: &Self::Shape, tolerance: ToleranceContext) -> Result<BoundingBox, GeometryError>;
+    fn topology_counts(&self, shape: &Self::Shape, tolerance: ToleranceContext) -> Result<TopologyCounts, GeometryError>;
+    fn face_descriptors(&self, shape: &Self::Shape, tolerance: ToleranceContext) -> Result<Vec<FaceDescriptor>, GeometryError>;
+    fn edge_descriptors(&self, shape: &Self::Shape, tolerance: ToleranceContext) -> Result<Vec<EdgeDescriptor>, GeometryError>;
+    fn resolve_face_descriptor(&self, shape: &Self::Shape, query: &FaceDescriptor, tolerance: ToleranceContext) -> Result<ReferenceResolution<FaceDescriptor>, GeometryError> {
+        tolerance.validate()?;
+        query.validate()?;
+        let matches = self
+            .face_descriptors(shape, tolerance)?
+            .into_iter()
+            .filter(|candidate| candidate.matches_within(*query, tolerance.validation))
+            .collect::<Vec<_>>();
+        Ok(match matches.as_slice() {
+            [] => ReferenceResolution::NotFound,
+            [found] => ReferenceResolution::Unique(*found),
+            _ => ReferenceResolution::Ambiguous,
+        })
+    }
+    fn resolve_edge_descriptor(&self, shape: &Self::Shape, query: &EdgeDescriptor, tolerance: ToleranceContext) -> Result<ReferenceResolution<EdgeDescriptor>, GeometryError> {
+        tolerance.validate()?;
+        query.validate()?;
+        let matches = self
+            .edge_descriptors(shape, tolerance)?
+            .into_iter()
+            .filter(|candidate| candidate.matches_within(*query, tolerance.validation))
+            .collect::<Vec<_>>();
+        Ok(match matches.as_slice() {
+            [] => ReferenceResolution::NotFound,
+            [found] => ReferenceResolution::Unique(*found),
+            _ => ReferenceResolution::Ambiguous,
+        })
+    }
+    fn validate(&self, shape: &Self::Shape, tolerance: ToleranceContext) -> Result<ValidationResult, GeometryError>;
+}
+#[derive(Clone, Debug)]
+pub struct GeometryResult<S> {
+    pub shape: S,
+    pub kind: GeometryKind,
+    pub evidence: GeometryEvidence,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ValidationResult {
+    pub valid: bool,
+    pub manifold: bool,
+    pub message: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tolerance_must_be_finite_and_non_negative() {
+        assert!(ToleranceContext { modeling: 0., validation: 1e-9 }.validate().is_ok());
+        assert!(ToleranceContext { modeling: 1e-9, validation: 0. }.validate().is_ok());
+        assert_eq!(ToleranceContext { modeling: -1., validation: 0. }.validate(), Err(GeometryError::InvalidTolerance));
+        assert_eq!(ToleranceContext { modeling: f64::NAN, validation: 0. }.validate(), Err(GeometryError::InvalidTolerance));
+        assert_eq!(ToleranceContext { modeling: 0., validation: f64::INFINITY }.validate(), Err(GeometryError::InvalidTolerance));
+    }
+    #[test]
+    fn bounding_box_requires_finite_ordered_extents() {
+        assert!(BoundingBox { min_x: 0., min_y: 0., min_z: 0., max_x: 1., max_y: 2., max_z: 3. }.validate().is_ok());
+        assert_eq!(BoundingBox { min_x: f64::NAN, min_y: 0., min_z: 0., max_x: 1., max_y: 2., max_z: 3. }.validate(), Err(GeometryError::InvalidInput("bounding box contains non-finite values")));
+        assert_eq!(BoundingBox { min_x: 2., min_y: 0., min_z: 0., max_x: 1., max_y: 2., max_z: 3. }.validate(), Err(GeometryError::InvalidInput("bounding box minimum exceeds maximum")));
+    }
+    #[test]
+    fn topology_counts_are_explicit_and_unsigned() {
+        let counts = TopologyCounts { solids: 1, shells: 1, faces: 6, edges: 12, vertices: 8 };
+        assert_eq!(counts.solids, 1);
+        assert_eq!(counts.vertices, 8);
+    }
+    #[test]
+    fn face_descriptor_requires_finite_non_negative_area_and_valid_bounds() {
+        let descriptor = FaceDescriptor { area: 1., bounds: BoundingBox { min_x: 0., min_y: 0., min_z: 0., max_x: 1., max_y: 1., max_z: 0. }, boundary_edge_count: 4 };
+        assert!(descriptor.validate().is_ok());
+        assert_eq!(FaceDescriptor { area: -1., ..descriptor }.validate(), Err(GeometryError::InvalidInput("face descriptor area must be finite and non-negative")));
+        assert_eq!(FaceDescriptor { area: f64::NAN, ..descriptor }.validate(), Err(GeometryError::InvalidInput("face descriptor area must be finite and non-negative")));
+        assert_eq!(FaceDescriptor { boundary_edge_count: 0, ..descriptor }.validate(), Err(GeometryError::InvalidInput("face descriptor must have at least one boundary edge")));
+    }
+    #[test]
+    fn face_descriptor_matching_respects_validation_tolerance() {
+        let a = FaceDescriptor { area: 100., bounds: BoundingBox { min_x: 0., min_y: 0., min_z: 0., max_x: 10., max_y: 10., max_z: 0. }, boundary_edge_count: 4 };
+        let b = FaceDescriptor { area: 100.00001, bounds: BoundingBox { min_x: 0., min_y: 0., min_z: 0.000001, max_x: 10., max_y: 10., max_z: 0.000001 }, boundary_edge_count: 4 };
+        assert!(a.matches_within(b, 1e-6));
+        assert!(!a.matches_within(b, 1e-8));
+    }
+    #[test]
+    fn edge_descriptor_requires_positive_topology_evidence() {
+        let descriptor = EdgeDescriptor { length: 5., bounds: BoundingBox { min_x: 0., min_y: 0., min_z: 0., max_x: 5., max_y: 0., max_z: 0. }, face_use_count: 2, vertex_use_count: 2 };
+        assert!(descriptor.validate().is_ok());
+        assert_eq!(EdgeDescriptor { length: -1., ..descriptor }.validate(), Err(GeometryError::InvalidInput("edge descriptor length must be finite and non-negative")));
+        assert_eq!(EdgeDescriptor { face_use_count: 0, ..descriptor }.validate(), Err(GeometryError::InvalidInput("edge descriptor must have at least one face use")));
+        assert_eq!(EdgeDescriptor { vertex_use_count: 0, ..descriptor }.validate(), Err(GeometryError::InvalidInput("edge descriptor must have at least one vertex use")));
+    }
+    #[test]
+    fn edge_descriptor_matching_respects_validation_tolerance() {
+        let a = EdgeDescriptor { length: 10., bounds: BoundingBox { min_x: 0., min_y: 0., min_z: 0., max_x: 10., max_y: 0., max_z: 0. }, face_use_count: 2, vertex_use_count: 2 };
+        let b = EdgeDescriptor { length: 10.000009, bounds: BoundingBox { min_x: 0., min_y: 0., min_z: 0., max_x: 10.000009, max_y: 0., max_z: 0. }, face_use_count: 2, vertex_use_count: 2 };
+        assert!(a.matches_within(b, 1e-6));
+        assert!(!a.matches_within(b, 1e-8));
+    }
+}
