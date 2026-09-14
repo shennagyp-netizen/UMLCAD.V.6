@@ -58,7 +58,6 @@ impl GeometryBackend for OcctBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use umlcad_v6_geometry_api::GeometryStatus;
 
     #[test]
     fn backend_name_is_stable() {
@@ -77,10 +76,10 @@ mod tests {
             },
         );
 
-        assert_eq!(
-            result,
-            Err(GeometryError::Unsupported("OCCT bridge not implemented yet"))
-        );
-        let _ = GeometryStatus::Unsupported;
+        match result {
+            Err(GeometryError::Unsupported("OCCT bridge not implemented yet")) => {}
+            Err(other) => panic!("unexpected geometry error: {other:?}"),
+            Ok(_) => panic!("unimplemented OCCT backend unexpectedly returned geometry"),
+        }
     }
 }
