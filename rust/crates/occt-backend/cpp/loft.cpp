@@ -9,6 +9,7 @@
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Shell.hxx>
+#include <TopoDS_Solid.hxx>
 #include <TopoDS.hxx>
 #include <gp_Pnt.hxx>
 #include <algorithm>
@@ -55,7 +56,7 @@ extern "C" int32_t umlcad_occt_loft_polygons(const double* lower_xy,uint32_t low
         for(TopExp_Explorer explorer(sewed,TopAbs_SHELL);explorer.More();explorer.Next()){shell=TopoDS::Shell(explorer.Current());break;}
         if(shell.IsNull())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
         BRepBuilderAPI_MakeSolid solid_builder(shell);if(!solid_builder.IsDone())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
-        TopoDS_Shape shape=solid_builder.Solid();if(shape.IsNull())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
-        auto* result=new(std::nothrow) umlcad_occt_shape{shape};if(!result)return UMLCAD_OCCT_INTERNAL_ERROR;*out_shape=result;return UMLCAD_OCCT_OK;
+        TopoDS_Solid solid=solid_builder.Solid();if(solid.IsNull())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
+        auto* result=new(std::nothrow) umlcad_occt_shape{solid};if(!result)return UMLCAD_OCCT_INTERNAL_ERROR;*out_shape=result;return UMLCAD_OCCT_OK;
     }catch(...){return UMLCAD_OCCT_INTERNAL_ERROR;}
 }
