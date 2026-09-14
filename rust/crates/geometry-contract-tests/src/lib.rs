@@ -1,12 +1,31 @@
 //! Contract tests shared by every V6 geometry backend.
 //! These tests define behavior independently of backend implementation details.
 
-use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, ToleranceContext, ValidationResult};
+use umlcad_v6_geometry_api::{
+    BoundingBox, GeometryBackend, GeometryError, GeometryKind, ToleranceContext, ValidationResult,
+};
 
 const TOLERANCE: ToleranceContext = ToleranceContext {
     modeling: 1e-9,
     validation: 1e-9,
 };
+
+fn assert_close(actual: f64, expected: f64, tolerance: f64) {
+    assert!(
+        (actual - expected).abs() <= tolerance,
+        "expected {expected:.17e}, got {actual:.17e}"
+    );
+}
+
+fn assert_box(actual: BoundingBox, expected: BoundingBox) {
+    const EPSILON: f64 = 1e-9;
+    assert_close(actual.min_x, expected.min_x, EPSILON);
+    assert_close(actual.min_y, expected.min_y, EPSILON);
+    assert_close(actual.min_z, expected.min_z, EPSILON);
+    assert_close(actual.max_x, expected.max_x, EPSILON);
+    assert_close(actual.max_y, expected.max_y, EPSILON);
+    assert_close(actual.max_z, expected.max_z, EPSILON);
+}
 
 pub fn assert_backend_identity<B: GeometryBackend>(backend: &B, expected: &'static str) {
     assert_eq!(backend.backend_name(), expected);
@@ -84,6 +103,74 @@ pub fn assert_numeric_scale_survives_validation<B: GeometryBackend>(backend: &B)
     }
 }
 
+pub fn assert_bounding_box_contract<B: GeometryBackend>(backend: &B) {
+    let solid = backend
+        .box_solid(10.0, 20.0, 30.0, TOLERANCE)
+        .expect("box construction should succeed")
+        .shape;
+    let bounds = backend
+        .bounding_box(&solid, TOLERANCE)
+        .expect("bounding-box measurement should succeed");
+
+    assert_box(
+        bounds,
+        BoundingBox {
+            min_x: 0.0,
+            min_y: 0.0,
+            min_z: 0.0,
+            max_x: 10.0,
+            max_y: 20.0,
+            max_z: 30.0,
+        },
+    );
+}
+
+pub fn assert_translation_and_rotation_change_bounds_predictably<B: GeometryBackend>(backend: &B) {
+    let solid = backend
+        .box_solid(10.0, 20.0, 30.0, TOLERANCE)
+        .expect("box construction should succeed")
+        .shape;
+
+    let translated = backend
+        .translate(&solid, 100.0, -200.0, 300.0, TOLERANCE)
+        .expect("translation should succeed")
+        .shape;
+    assert_box(
+        backend.bounding_box(&translated, TOLERANCE).unwrap(),
+        BoundingBox {
+            min_x: 100.0,
+            min_y: -200.0,
+            min_z: 300.0,
+            max_x: 110.0,
+            max_y: -180.0,
+            max_z: 330.0,
+        },
+    );
+
+    let rotated = backend
+        .rotate(
+            &solid,
+            0.0,
+            0.0,
+            1.0,
+            core::f64::consts::FRAC_PI_2,
+            TOLERANCE,
+        )
+        .expect("rotation should succeed")
+        .shape;
+    assert_box(
+        backend.bounding_box(&rotated, TOLERANCE).unwrap(),
+        BoundingBox {
+            min_x: -20.0,
+            min_y: 0.0,
+            min_z: 0.0,
+            max_x: 0.0,
+            max_y: 10.0,
+            max_z: 30.0,
+        },
+    );
+}
+
 pub fn assert_translation_preserves_validation<B: GeometryBackend>(backend: &B) {
     let solid = backend
         .box_solid(10.0, 20.0, 30.0, TOLERANCE)
@@ -116,7 +203,7 @@ pub fn assert_rotation_preserves_validation<B: GeometryBackend>(backend: &B) {
         let rotated = backend
             .rotate(&solid, 0.0, 0.0, 1.0, angle, TOLERANCE)
             .unwrap_or_else(|error| panic!("rotation failed for angle {angle}: {error}"));
-        assert_eq!(rotated.kind, umlcad_v6_geometry_api::GeometryKind::Solid);
+        assert_eq!(rotated.kind, GeometryKind::Solid);
         assert_eq!(rotated.evidence.tolerance, TOLERANCE);
         assert_eq!(
             backend.validate(&rotated.shape, TOLERANCE).unwrap(),
@@ -193,6 +280,16 @@ mod tests {
     #[test]
     fn occt_numeric_scale_contract() {
         assert_numeric_scale_survives_validation(&OcctBackend::new());
+    }
+
+    #[test]
+    fn occt_bounding_box_contract() {
+        assert_bounding_box_contract(&OcctBackend::new());
+    }
+
+    #[test]
+    fn occt_transform_measurement_contract() {
+        assert_translation_and_rotation_change_bounds_predictably(&OcctBackend::new());
     }
 
     #[test]
