@@ -21,11 +21,8 @@ int32_t umlcad_occt_box(double width, double depth, double height, umlcad_occt_s
 int32_t umlcad_occt_cylinder(double radius, double height, umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_sphere(double radius, umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_cone(double base_radius, double top_radius, double height, umlcad_occt_shape** out_shape);
-int32_t umlcad_occt_extrude_polygon(
-    const double* points_xy,
-    uint32_t point_count,
-    double height,
-    umlcad_occt_shape** out_shape);
+int32_t umlcad_occt_extrude_polygon(const double* points_xy, uint32_t point_count, double height, umlcad_occt_shape** out_shape);
+int32_t umlcad_occt_revolve_polygon(const double* profile_rz, uint32_t point_count, double angle_radians, umlcad_occt_shape** out_shape);
 
 int32_t umlcad_occt_fuse(const umlcad_occt_shape* left, const umlcad_occt_shape* right, umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_common(const umlcad_occt_shape* left, const umlcad_occt_shape* right, umlcad_occt_shape** out_shape);
