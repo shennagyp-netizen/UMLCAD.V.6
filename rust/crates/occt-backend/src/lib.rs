@@ -227,8 +227,13 @@ mod tests {
         for dimensions in [
             (0.0, 20.0, 30.0),
             (-1.0, 20.0, 30.0),
+            (20.0, 0.0, 30.0),
+            (20.0, -1.0, 30.0),
+            (20.0, 30.0, 0.0),
+            (20.0, 30.0, -1.0),
             (f64::NAN, 20.0, 30.0),
-            (f64::INFINITY, 20.0, 30.0),
+            (20.0, f64::INFINITY, 30.0),
+            (20.0, 30.0, f64::NEG_INFINITY),
         ] {
             match backend.box_solid(dimensions.0, dimensions.1, dimensions.2, TOLERANCE) {
                 Err(GeometryError::InvalidInput(_)) => {}
@@ -239,10 +244,39 @@ mod tests {
     }
 
     #[test]
+    fn invalid_tolerance_is_rejected() {
+        let backend = OcctBackend::new();
+        for tolerance in [
+            ToleranceContext {
+                modeling: -1e-9,
+                validation: 1e-9,
+            },
+            ToleranceContext {
+                modeling: f64::NAN,
+                validation: 1e-9,
+            },
+            ToleranceContext {
+                modeling: 1e-9,
+                validation: f64::INFINITY,
+            },
+        ] {
+            match backend.box_solid(10.0, 20.0, 30.0, tolerance) {
+                Err(GeometryError::InvalidTolerance) => {}
+                Err(err) => panic!("unexpected error for invalid tolerance: {err:?}"),
+                Ok(_) => panic!("invalid tolerance unexpectedly succeeded"),
+            }
+        }
+    }
+
+    #[test]
     fn invalid_translation_is_rejected() {
         let backend = OcctBackend::new();
         let shape = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
-        for translation in [(f64::NAN, 0.0, 0.0), (0.0, f64::INFINITY, 0.0)] {
+        for translation in [
+            (f64::NAN, 0.0, 0.0),
+            (0.0, f64::INFINITY, 0.0),
+            (0.0, 0.0, f64::NEG_INFINITY),
+        ] {
             match backend.translate(&shape, translation.0, translation.1, translation.2, TOLERANCE) {
                 Err(GeometryError::InvalidInput(_)) => {}
                 Err(err) => panic!("unexpected translation error: {err:?}"),
@@ -252,11 +286,29 @@ mod tests {
     }
 
     #[test]
+    fn numeric_scale_survives_validation() {
+        let backend = OcctBackend::new();
+        for edge in [1e-12, 1e-9, 1e-6, 1e3, 1e6] {
+            let result = backend
+                .box_solid(edge, edge * 2.0, edge * 3.0, TOLERANCE)
+                .unwrap_or_else(|error| panic!("failed scale {edge:e}: {error}"));
+            let validation = backend
+                .validate(&result.shape, TOLERANCE)
+                .unwrap_or_else(|error| panic!("validation failed at scale {edge:e}: {error}"));
+            assert_eq!(validation, ValidationResult {
+                valid: true,
+                manifold: true,
+                message: None,
+            });
+        }
+    }
+
+    #[test]
     fn translation_returns_new_valid_shape_and_preserves_source() {
         let backend = OcctBackend::new();
         let source = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
         let translated = backend
-            .translate(&source, 1000.0, -2000.0, 3000.0, TOLERANCE)
+            .translate(&source, 1e6, -2e6, 3e6, TOLERANCE)
             .unwrap();
 
         assert_eq!(translated.evidence.tolerance, TOLERANCE);
@@ -273,11 +325,37 @@ mod tests {
     }
 
     #[test]
+    fn deterministic_validation_is_stable() {
+        let backend = OcctBackend::new();
+        let mut expected = None;
+        for _ in 0..32 {
+            let shape = backend.box_solid(37.0, 11.0, 5.0, TOLERANCE).unwrap().shape;
+            let current = backend.validate(&shape, TOLERANCE).unwrap();
+            match &expected {
+                Some(value) => assert_eq!(&current, value),
+                None => expected = Some(current),
+            }
+        }
+    }
+
+    #[test]
     fn clone_has_independent_owner() {
         let backend = OcctBackend::new();
         let original = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
         let clone = original.clone();
         drop(original);
         assert!(backend.validate(&clone, TOLERANCE).unwrap().valid);
+    }
+
+    #[test]
+    fn repeated_lifetime_cycles_remain_valid() {
+        let backend = OcctBackend::new();
+        for _ in 0..512 {
+            let source = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
+            let clone = source.clone();
+            let translated = backend.translate(&clone, 123.0, -456.0, 789.0, TOLERANCE).unwrap();
+            assert!(backend.validate(&source, TOLERANCE).unwrap().valid);
+            assert!(backend.validate(&translated.shape, TOLERANCE).unwrap().valid);
+        }
     }
 }
