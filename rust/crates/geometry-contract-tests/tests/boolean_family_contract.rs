@@ -1,14 +1,18 @@
-use umlcad_v6_geometry_api::{GeometryBackend, ToleranceContext};
+use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, ToleranceContext};
 use umlcad_v6_occt_backend::OcctBackend;
 
 const TOLERANCE: ToleranceContext = ToleranceContext { modeling: 1e-9, validation: 1e-9 };
+
+fn shifted_box(backend: &OcctBackend, x: f64) -> umlcad_v6_occt_backend::OcctShape {
+    let base = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+    backend.translate(&base, x, 0.0, 0.0, TOLERANCE).unwrap().shape
+}
 
 #[test]
 fn common_and_cut_produce_valid_results() {
     let backend = OcctBackend::new();
     let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
-    let right_base = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
-    let right = backend.translate(&right_base, 5.0, 0.0, 0.0, TOLERANCE).unwrap().shape;
+    let right = shifted_box(&backend, 5.0);
 
     let common = backend.common(&left, &right, TOLERANCE).unwrap().shape;
     let cut = backend.cut(&left, &right, TOLERANCE).unwrap().shape;
@@ -26,16 +30,50 @@ fn common_and_cut_produce_valid_results() {
 }
 
 #[test]
+fn disjoint_fuse_remains_a_valid_multi_solid_result() {
+    let backend = OcctBackend::new();
+    let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+    let right = shifted_box(&backend, 20.0);
+
+    let fused = backend.fuse(&left, &right, TOLERANCE).unwrap().shape;
+
+    assert!(backend.validate(&fused, TOLERANCE).unwrap().valid);
+    assert_eq!(backend.topology_counts(&fused, TOLERANCE).unwrap().solids, 2);
+
+    let bounds = backend.bounding_box(&fused, TOLERANCE).unwrap();
+    assert!((bounds.min_x - 0.0).abs() <= 1e-9);
+    assert!((bounds.max_x - 30.0).abs() <= 1e-9);
+}
+
+#[test]
+fn disjoint_common_is_rejected_as_unrepresentable_empty_geometry() {
+    let backend = OcctBackend::new();
+    let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+    let right = shifted_box(&backend, 20.0);
+
+    assert!(matches!(
+        backend.common(&left, &right, TOLERANCE),
+        Err(GeometryError::Unsupported(_))
+    ));
+}
+
+#[test]
+fn full_containment_cut_is_rejected_when_result_is_empty() {
+    let backend = OcctBackend::new();
+    let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+    let inner = backend.box_solid(20.0, 20.0, 20.0, TOLERANCE).unwrap().shape;
+
+    assert!(matches!(
+        backend.cut(&left, &inner, TOLERANCE),
+        Err(GeometryError::Unsupported(_))
+    ));
+}
+
+#[test]
 fn Boolean_results_are_deterministic_for_identical_operands() {
     let backend = OcctBackend::new();
     let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
-    let right = backend.translate(
-        &backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape,
-        5.0,
-        0.0,
-        0.0,
-        TOLERANCE,
-    ).unwrap().shape;
+    let right = shifted_box(&backend, 5.0);
 
     for operation in [0_u8, 1_u8, 2_u8] {
         let first = match operation {
@@ -48,7 +86,13 @@ fn Boolean_results_are_deterministic_for_identical_operands() {
             1 => backend.common(&left, &right, TOLERANCE).unwrap().shape,
             _ => backend.cut(&left, &right, TOLERANCE).unwrap().shape,
         };
-        assert_eq!(backend.bounding_box(&first, TOLERANCE).unwrap(), backend.bounding_box(&second, TOLERANCE).unwrap());
-        assert_eq!(backend.topology_counts(&first, TOLERANCE).unwrap(), backend.topology_counts(&second, TOLERANCE).unwrap());
+        assert_eq!(
+            backend.bounding_box(&first, TOLERANCE).unwrap(),
+            backend.bounding_box(&second, TOLERANCE).unwrap()
+        );
+        assert_eq!(
+            backend.topology_counts(&first, TOLERANCE).unwrap(),
+            backend.topology_counts(&second, TOLERANCE).unwrap()
+        );
     }
 }
