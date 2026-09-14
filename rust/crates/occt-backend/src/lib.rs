@@ -1,8 +1,8 @@
 use std::ptr::NonNull;
 
 use umlcad_v6_geometry_api::{
-    GeometryBackend, GeometryError, GeometryEvidence, GeometryKind, GeometryResult, GeometryStatus,
-    ToleranceContext, ValidationResult,
+    BoundingBox, GeometryBackend, GeometryError, GeometryEvidence, GeometryKind, GeometryResult,
+    GeometryStatus, ToleranceContext, ValidationResult,
 };
 
 #[repr(C)]
@@ -28,6 +28,7 @@ unsafe extern "C" {
         angle_radians: f64,
         out_shape: *mut *mut NativeShape,
     ) -> i32;
+    fn umlcad_occt_shape_bounding_box(input: *const NativeShape, out_bounds: *mut f64) -> i32;
     fn umlcad_occt_shape_validate(input: *const NativeShape, valid: *mut i32, manifold: *mut i32) -> i32;
     fn umlcad_occt_shape_delete(shape: *mut NativeShape);
 }
@@ -248,6 +249,33 @@ impl GeometryBackend for OcctBackend {
         })
     }
 
+    fn bounding_box(
+        &self,
+        shape: &Self::Shape,
+        tolerance: ToleranceContext,
+    ) -> Result<BoundingBox, GeometryError> {
+        tolerance.validate()?;
+
+        let mut values = [0.0_f64; 6];
+        let status = unsafe {
+            umlcad_occt_shape_bounding_box(shape.raw.as_ptr(), values.as_mut_ptr())
+        };
+        if status != OCCT_OK {
+            return Err(Self::map_status(status, "OCCT bounding-box measurement failed"));
+        }
+
+        let bounds = BoundingBox {
+            min_x: values[0],
+            min_y: values[1],
+            min_z: values[2],
+            max_x: values[3],
+            max_y: values[4],
+            max_z: values[5],
+        };
+        bounds.validate()?;
+        Ok(bounds)
+    }
+
     fn validate(
         &self,
         shape: &Self::Shape,
@@ -281,6 +309,10 @@ mod tests {
         validation: 1e-9,
     };
 
+    fn assert_close(actual: f64, expected: f64) {
+        assert!((actual - expected).abs() <= 1e-9);
+    }
+
     #[test]
     fn backend_name_is_stable() {
         assert_eq!(OcctBackend::new().backend_name(), "occt");
@@ -298,6 +330,48 @@ mod tests {
             manifold: true,
             message: None,
         });
+    }
+
+    #[test]
+    fn bounding_box_matches_box_geometry() {
+        let backend = OcctBackend::new();
+        let shape = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
+        let bounds = backend.bounding_box(&shape, TOLERANCE).unwrap();
+        assert_close(bounds.min_x, 0.0);
+        assert_close(bounds.min_y, 0.0);
+        assert_close(bounds.min_z, 0.0);
+        assert_close(bounds.max_x, 10.0);
+        assert_close(bounds.max_y, 20.0);
+        assert_close(bounds.max_z, 30.0);
+    }
+
+    #[test]
+    fn transformed_bounding_box_is_numerically_correct() {
+        let backend = OcctBackend::new();
+        let shape = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
+        let translated = backend
+            .translate(&shape, 100.0, -200.0, 300.0, TOLERANCE)
+            .unwrap()
+            .shape;
+        let translated_bounds = backend.bounding_box(&translated, TOLERANCE).unwrap();
+        assert_close(translated_bounds.min_x, 100.0);
+        assert_close(translated_bounds.min_y, -200.0);
+        assert_close(translated_bounds.min_z, 300.0);
+        assert_close(translated_bounds.max_x, 110.0);
+        assert_close(translated_bounds.max_y, -180.0);
+        assert_close(translated_bounds.max_z, 330.0);
+
+        let rotated = backend
+            .rotate(&shape, 0.0, 0.0, 1.0, std::f64::consts::FRAC_PI_2, TOLERANCE)
+            .unwrap()
+            .shape;
+        let rotated_bounds = backend.bounding_box(&rotated, TOLERANCE).unwrap();
+        assert_close(rotated_bounds.min_x, -20.0);
+        assert_close(rotated_bounds.min_y, 0.0);
+        assert_close(rotated_bounds.min_z, 0.0);
+        assert_close(rotated_bounds.max_x, 0.0);
+        assert_close(rotated_bounds.max_y, 10.0);
+        assert_close(rotated_bounds.max_z, 30.0);
     }
 
     #[test]
