@@ -36,6 +36,36 @@ impl ToleranceContext {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BoundingBox {
+    pub min_x: f64,
+    pub min_y: f64,
+    pub min_z: f64,
+    pub max_x: f64,
+    pub max_y: f64,
+    pub max_z: f64,
+}
+
+impl BoundingBox {
+    pub fn validate(self) -> Result<(), GeometryError> {
+        let values = [
+            self.min_x,
+            self.min_y,
+            self.min_z,
+            self.max_x,
+            self.max_y,
+            self.max_z,
+        ];
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(GeometryError::InvalidInput("bounding box contains non-finite values"));
+        }
+        if self.min_x > self.max_x || self.min_y > self.max_y || self.min_z > self.max_z {
+            return Err(GeometryError::InvalidInput("bounding box minimum exceeds maximum"));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct GeometryEvidence {
     pub status: GeometryStatus,
@@ -93,6 +123,12 @@ pub trait GeometryBackend {
         tolerance: ToleranceContext,
     ) -> Result<GeometryResult<Self::Shape>, GeometryError>;
 
+    fn bounding_box(
+        &self,
+        shape: &Self::Shape,
+        tolerance: ToleranceContext,
+    ) -> Result<BoundingBox, GeometryError>;
+
     fn validate(
         &self,
         shape: &Self::Shape,
@@ -137,6 +173,45 @@ mod tests {
         assert_eq!(
             ToleranceContext { modeling: 0.0, validation: f64::INFINITY }.validate(),
             Err(GeometryError::InvalidTolerance)
+        );
+    }
+
+    #[test]
+    fn bounding_box_requires_finite_ordered_extents() {
+        assert!(BoundingBox {
+            min_x: 0.0,
+            min_y: 0.0,
+            min_z: 0.0,
+            max_x: 1.0,
+            max_y: 2.0,
+            max_z: 3.0,
+        }
+        .validate()
+        .is_ok());
+
+        assert_eq!(
+            BoundingBox {
+                min_x: f64::NAN,
+                min_y: 0.0,
+                min_z: 0.0,
+                max_x: 1.0,
+                max_y: 2.0,
+                max_z: 3.0,
+            }
+            .validate(),
+            Err(GeometryError::InvalidInput("bounding box contains non-finite values"))
+        );
+        assert_eq!(
+            BoundingBox {
+                min_x: 2.0,
+                min_y: 0.0,
+                min_z: 0.0,
+                max_x: 1.0,
+                max_y: 2.0,
+                max_z: 3.0,
+            }
+            .validate(),
+            Err(GeometryError::InvalidInput("bounding box minimum exceeds maximum"))
         );
     }
 }
