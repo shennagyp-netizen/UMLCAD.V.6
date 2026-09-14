@@ -29,12 +29,13 @@ bool hasSolid(const TopoDS_Shape& shape) {
     return false;
 }
 
-bool finite(double value) {
+bool isFiniteValue(double value) {
     return std::isfinite(value);
 }
 
 bool finiteAxis(double x, double y, double z) {
-    return finite(x) && finite(y) && finite(z) && (x != 0.0 || y != 0.0 || z != 0.0);
+    return isFiniteValue(x) && isFiniteValue(y) && isFiniteValue(z)
+        && (x != 0.0 || y != 0.0 || z != 0.0);
 }
 
 }
@@ -149,7 +150,7 @@ extern "C" int32_t umlcad_occt_shape_rotate(
     }
     *out_shape = nullptr;
 
-    if (!finiteAxis(axis_x, axis_y, axis_z) || !finite(angle_radians)) {
+    if (!finiteAxis(axis_x, axis_y, axis_z) || !isFiniteValue(angle_radians)) {
         return UMLCAD_OCCT_INVALID_ARGUMENT;
     }
 
