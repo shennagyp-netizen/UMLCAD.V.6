@@ -117,7 +117,9 @@ The first V6 backend contract is deliberately small:
 - reject invalid dimensions before entering OCCT;
 - validate the resulting solid;
 - translate an existing immutable shape into a new shape;
-- preserve validation status through translation;
+- rotate an existing immutable shape around a finite non-zero axis;
+- measure a precise axis-aligned bounding box;
+- preserve validation status through transforms;
 - return explicit backend/tolerance evidence;
 - maintain ownership safety across Rust/C++ boundaries;
 - never expose raw OCCT pointers through the UMLCAD API.
@@ -126,11 +128,9 @@ The first primitive is intentionally simple because the purpose of the phase is 
 
 ## 5. Phase A — make the contract genuinely RED
 
-### A1. Replace placeholder OCCT tests
+### A1. Mandatory primitive/transform tests
 
-Turn the currently ignored box/translation contract tests into mandatory tests.
-
-Tests must cover:
+Required tests cover:
 
 - positive finite dimensions succeed;
 - zero dimensions reject;
@@ -141,13 +141,16 @@ Tests must cover:
 - invalid tolerance rejects;
 - finite translation succeeds;
 - NaN/infinite translation rejects;
-- validation of source and translated shape succeeds;
-- source remains valid after translation;
-- translation creates a distinct immutable result.
+- finite non-zero rotation succeeds;
+- zero rotation axis rejects;
+- NaN/infinite rotation rejects;
+- bounding-box measurement is finite and ordered;
+- source remains valid after every transform;
+- transform results are new immutable shapes.
 
 Do not use generic assertions that require backend shape types to implement `Debug` or `PartialEq`.
 
-### A2. Add boundary ownership tests
+### A2. Ownership tests
 
 The Rust-side shape handle must prove:
 
@@ -159,15 +162,11 @@ The Rust-side shape handle must prove:
 
 These tests may use C++ test instrumentation in debug/test builds where direct leak detection is otherwise impractical.
 
-### A3. Expected state
-
-At the end of Phase A, the branch must be RED for the right reason: the required OCCT operation is absent, not because of an invalid test harness.
-
 ## 6. Phase B — native C++ OCCT backend
 
 ### B1. C++ project
 
-Create a small CMake target under the V6 Rust geometry workspace, for example:
+Create a small CMake target under the V6 Rust geometry workspace:
 
 ```text
 rust/crates/occt-backend/
@@ -185,11 +184,12 @@ The exact tree may change during implementation, but the boundary must remain ex
 
 ### B2. Native OCCT operations
 
-Implement the first operations with native OCCT APIs:
+The reference backend now uses:
 
 - `BRepPrimAPI_MakeBox` for construction;
-- `BRepBuilderAPI_Transform` plus `gp_Trsf` for translation;
+- `BRepBuilderAPI_Transform` plus `gp_Trsf` for translation and rotation;
 - `BRepCheck_Analyzer` for geometric validity;
+- `BRepBndLib::AddOptimal` for precise bounding-box measurement;
 - topology exploration sufficient to prove that a primitive box contains a solid;
 - explicit native error/status conversion.
 
@@ -197,14 +197,16 @@ C++ exceptions must not cross an FFI boundary.
 
 ### B3. ABI boundary
 
-Expose a narrow C ABI from the C++ library. The public Rust crate should see opaque handles and POD-like status values only.
+Expose a narrow C ABI from the C++ library. The public Rust crate sees opaque handles and POD-like status values only.
 
-The C ABI must provide deterministic ownership semantics for:
+The C ABI now provides deterministic ownership semantics for:
 
 ```text
 create box
 clone shape
 translate shape
+rotate shape
+measure bounding box
 validate shape
 release shape
 ```
@@ -234,6 +236,8 @@ The milestone is valid only when:
 - box creation is green;
 - invalid-input tests are green;
 - translation is green;
+- rotation is green;
+- bounding-box measurement is green;
 - validation is green;
 - ownership tests are green;
 - existing geometry API unit tests remain green.
@@ -253,13 +257,22 @@ Test geometry dimensions and transforms around:
 - modeling tolerance;
 - validation tolerance;
 - just-above/just-below tolerance;
-- `1e-12`, `1e-9`, `1e-6`;
-- `1e3`, `1e6`, and other large engineering scales;
+- the observed OCCT reference-resolution boundary;
 - mixed large coordinates plus small features;
 - NaN;
 - positive/negative infinity.
 
-The objective is to ensure that numeric scale does not silently alter the UMLCAD semantic decision.
+The current reference CI environment uses Ubuntu 24.04 with OCCT 7.6.3. Empirical tests showed that the reference box contract must conservatively reject edges at or below `1e-6`; this is recorded as a backend capability limit, not as a universal mathematical limit of OCCT and not as UMLCAD's semantic modeling tolerance.
+
+The test policy is therefore:
+
+```text
+UMLCAD modeling tolerance
+        ≠
+backend realizability limit
+```
+
+Neither value may be silently substituted for the other.
 
 ### D2. Immutability attacks
 
@@ -269,7 +282,15 @@ Repeated operations must prove:
 - failure leaves the original shape unchanged;
 - repeated evaluation of identical immutable inputs gives equivalent semantic results.
 
-### D3. Topology attacks
+### D3. Measurement attacks
+
+Bounding-box measurement must not silently inherit backend tolerance inflation.
+
+The reference implementation uses `BRepBndLib::AddOptimal` with shape-tolerance enlargement disabled and a zero explicit `Bnd_Box` gap. A test failure caused by OCCT's default bounding-box tolerance expansion was treated as an implementation defect and fixed rather than by widening the UMLCAD measurement tolerance.
+
+Tests must continue to verify exact analytic primitive bounds within the declared comparison tolerance and must include transformed cases.
+
+### D4. Topology attacks
 
 For the primitive baseline test:
 
@@ -278,15 +299,25 @@ For the primitive baseline test:
 - solid/manifold status is explicit;
 - validation failures remain failures even when a renderer could display the shape.
 
-### D4. Resource attacks
+The current `hasSolid()` check is only a baseline conformance signal. It is **not** yet sufficient to claim a complete manifold/topology proof for arbitrary B-Rep. Stronger topology evidence is a mandatory next phase.
 
-Repeated create/clone/translate/validate/release cycles must not show handle growth in the test instrumentation.
+### D5. Resource attacks
+
+Repeated create/clone/translate/rotate/measure/validate/release cycles must not show handle growth in the test instrumentation.
 
 ## 9. Phase E — .NET sample geometry corpus
 
-Before implementing more operations, inspect the actual existing `.NET` sample/test projects in V6 and inventory the geometries that are genuinely present.
+The existing V6 .NET corpus has been audited before extending the backend.
 
-Do not invent a geometry corpus from memory.
+Known real fixtures include:
+
+- a numeric 2D line from `(0,0)` to `(100,0)`;
+- a semantic `Solid` body placeholder whose representation is `body`, not an actual serialized B-Rep;
+- 4×4 occurrence transforms including translation components such as `(10,20,30)`.
+
+Therefore the repository currently does **not** contain a hidden mature 3D B-Rep sample corpus that can be treated as an existing geometry database.
+
+Future fixture work must preserve source provenance and must not invent undocumented source geometry. New geometry fixtures should be derived either from these real semantic/numeric cases or from explicit new engineering fixture files.
 
 For every imported fixture record:
 
@@ -296,10 +327,6 @@ For every imported fixture record:
 - expected topology;
 - exact/analytic versus tolerance-based expectations;
 - whether it exercises a new OCCT capability.
-
-Prioritize fixtures that represent real engineering usage rather than visually interesting shapes.
-
-Convert discovered geometry cases into reproducible backend-neutral fixtures where possible.
 
 ## 10. Phase F — expand operations one contract at a time
 
@@ -320,12 +347,12 @@ write contract tests
 → GREEN
 ```
 
-Order of expansion:
+Immediate operation order after the current primitive/transform baseline:
 
-1. transforms (translation, rotation, scaling where semantically valid);
-2. primitive solids;
-3. curves and analytic surfaces;
-4. topology inspection and stable geometric references;
+1. transform algebra/invariants;
+2. stronger topology inspection and stable geometric references;
+3. additional primitive solids;
+4. curves and analytic surfaces;
 5. Boolean union/difference/intersection;
 6. extrusions and revolutions;
 7. sweeps/lofts;
@@ -338,7 +365,23 @@ Order of expansion:
 
 The list is not permission to implement everything at once. Each line is a separate red-green gate.
 
-## 11. Semantic reference strategy
+## 11. Transform algebra gate
+
+Before adding more feature-building operations, V6 must prove the mathematical invariants of the current immutable transform layer.
+
+Required contracts:
+
+- zero translation is identity;
+- zero-angle rotation is identity;
+- translation composition equals the sum of translation vectors within declared measurement tolerance;
+- rotation by `2π` about a fixed axis is equivalent to identity within declared measurement tolerance;
+- valid transforms preserve solid validation;
+- transform order remains explicit and testable rather than being silently commuted;
+- source shapes remain unchanged.
+
+The tests must compare measured geometry/evidence rather than native pointers.
+
+## 12. Semantic reference strategy
 
 OCCT topology objects are not UMLCAD semantic identities.
 
@@ -355,13 +398,14 @@ Requirements:
 
 Topology-reference tests are mandatory before assembly or feature-history work depends on them.
 
-## 12. Accuracy and tolerance discipline
+## 13. Accuracy and tolerance discipline
 
 Maintain separate concepts for:
 
 ```text
 engineering acceptance tolerance
 OCCT/modeling tolerance
+backend realizability limit
 validation/measurement tolerance
 ```
 
@@ -376,7 +420,7 @@ Every result that depends materially on tolerance should expose enough evidence 
 
 A wider tolerance may never be introduced solely to make a test pass.
 
-## 13. Determinism gate
+## 14. Determinism gate
 
 For deterministic operations, run the same immutable request repeatedly and compare:
 
@@ -389,7 +433,7 @@ Do not compare native pointer values or process-local addresses.
 
 Where OCCT is nondeterministic internally but UMLCAD semantics are deterministic, normalize only at the UMLCAD boundary and test that normalization explicitly.
 
-## 14. Integration with the existing .NET boundary
+## 15. Integration with the existing .NET boundary
 
 Only after the native OCCT geometry contract is green should it become the backend of the existing .NET→Rust integration path.
 
@@ -409,7 +453,7 @@ Existing Rust kernel client and end-to-end tests remain regression gates.
 
 Invalid geometry, stale reference, timeout/cancellation, malformed response, wrong build identity, and concurrent-request tests must continue to pass.
 
-## 15. Performance gate
+## 16. Performance gate
 
 Performance work starts only after correctness is green.
 
@@ -418,6 +462,7 @@ Measure at minimum:
 - primitive construction latency;
 - validation latency;
 - transform latency;
+- measurement latency;
 - clone/copy cost;
 - FFI overhead;
 - repeated-operation throughput;
@@ -427,9 +472,9 @@ Optimize only without changing observable semantics.
 
 The first optimization targets are expected to be boundary crossings, unnecessary copies, and repeated validation—not speculative algorithm replacement.
 
-## 16. CI gate
+## 17. CI gate
 
-The CI workflow must eventually execute at least:
+The CI workflow executes at least:
 
 ```text
 cargo fmt --all --check
@@ -438,29 +483,30 @@ cargo test --workspace --all-targets --release
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-CI must install a known supported OCCT development environment and build the C++ backend from source.
+CI installs a known supported OCCT development environment and builds the C++ backend from source.
 
-The exact supported Linux package/version will be pinned by the workflow once the first green CI environment is established. Local success without CI success is not a completion claim.
+A successful CI run is the only basis for calling a completed slice GREEN.
 
-## 17. Completion criteria for the first V6 geometry milestone
+## 18. Completion criteria for the first V6 geometry milestone
 
 The milestone is complete only when all are true:
 
 - native C++ OCCT backend is used;
 - no required OCCT contract test is ignored;
-- box/create/validate/translate contracts are green;
+- box/create/validate/translate/rotate/measure contracts are green;
 - invalid numeric/tolerance inputs are green;
 - ownership and lifetime tests are green;
 - red-team numeric/topology/resource tests are green;
+- transform algebra tests are green;
 - determinism tests are green;
 - existing .NET/Rust regression tests remain green where applicable;
 - release-mode tests are green;
 - CI is green;
 - documentation records the exact implemented boundary and known limitations.
 
-## 18. V6 expansion policy
+## 19. V6 expansion policy
 
-The first green milestone does **not** mean V6 is a feature-complete SolidWorks-class kernel.
+The current green milestone does **not** mean V6 is a feature-complete SolidWorks-class kernel.
 
 It means the architecture and implementation method are proven with a scientifically testable native OCCT reference backend.
 
