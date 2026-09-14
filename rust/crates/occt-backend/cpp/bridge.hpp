@@ -23,6 +23,11 @@ int32_t umlcad_occt_box(
     double height,
     umlcad_occt_shape** out_shape);
 
+int32_t umlcad_occt_cylinder(
+    double radius,
+    double height,
+    umlcad_occt_shape** out_shape);
+
 int32_t umlcad_occt_shape_clone(
     const umlcad_occt_shape* input,
     umlcad_occt_shape** out_shape);
