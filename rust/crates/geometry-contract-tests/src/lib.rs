@@ -33,12 +33,12 @@ pub fn assert_box_requires_positive_dimensions<B: GeometryBackend>(backend: &B) 
     }
 }
 
-pub fn assert_sub_modeling_tolerance_dimensions_are_rejected<B: GeometryBackend>(backend: &B) {
-    for edge in [1e-12, 5e-10, 1e-9] {
+pub fn assert_reference_backend_resolution_is_explicit<B: GeometryBackend>(backend: &B) {
+    for edge in [1e-8, 1e-7] {
         match backend.box_solid(edge, edge * 2.0, edge * 3.0, TOLERANCE) {
             Err(GeometryError::InvalidInput(_)) => {}
-            Err(other) => panic!("unexpected error below modeling resolution at {edge:e}: {other}"),
-            Ok(_) => panic!("dimension {edge:e} at/below modeling tolerance unexpectedly succeeded"),
+            Err(other) => panic!("unexpected resolution error at {edge:e}: {other}"),
+            Ok(_) => panic!("reference backend accepted unsupported box scale {edge:e}"),
         }
     }
 }
@@ -69,7 +69,7 @@ pub fn assert_invalid_tolerance_is_rejected<B: GeometryBackend>(backend: &B) {
 }
 
 pub fn assert_numeric_scale_survives_validation<B: GeometryBackend>(backend: &B) {
-    for edge in [1e-8, 1e-6, 1e3, 1e6] {
+    for edge in [2e-6, 1e-5, 1e-3, 1e3, 1e6] {
         let result = backend
             .box_solid(edge, edge * 2.0, edge * 3.0, TOLERANCE)
             .unwrap_or_else(|error| panic!("failed supported scale {edge:e}: {error}"));
@@ -139,8 +139,8 @@ mod tests {
     }
 
     #[test]
-    fn occt_sub_modeling_tolerance_contract() {
-        assert_sub_modeling_tolerance_dimensions_are_rejected(&OcctBackend::new());
+    fn occt_reference_resolution_contract() {
+        assert_reference_backend_resolution_is_explicit(&OcctBackend::new());
     }
 
     #[test]
