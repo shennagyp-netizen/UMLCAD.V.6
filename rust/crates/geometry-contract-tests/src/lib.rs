@@ -2,7 +2,8 @@
 //! These tests define behavior independently of backend implementation details.
 
 use umlcad_v6_geometry_api::{
-    BoundingBox, GeometryBackend, GeometryError, GeometryKind, ToleranceContext, ValidationResult,
+    BoundingBox, GeometryBackend, GeometryError, GeometryKind, ToleranceContext, TopologyCounts,
+    ValidationResult,
 };
 
 const TOLERANCE: ToleranceContext = ToleranceContext {
@@ -125,6 +126,23 @@ pub fn assert_bounding_box_contract<B: GeometryBackend>(backend: &B) {
     );
 }
 
+pub fn assert_topology_counts_contract<B: GeometryBackend>(backend: &B) {
+    let solid = backend
+        .box_solid(10.0, 20.0, 30.0, TOLERANCE)
+        .expect("box construction should succeed")
+        .shape;
+    let counts = backend
+        .topology_counts(&solid, TOLERANCE)
+        .expect("topology count query should succeed");
+    assert_eq!(counts, TopologyCounts {
+        solids: 1,
+        shells: 1,
+        faces: 6,
+        edges: 12,
+        vertices: 8,
+    });
+}
+
 pub fn assert_translation_and_rotation_change_bounds_predictably<B: GeometryBackend>(backend: &B) {
     let solid = backend
         .box_solid(10.0, 20.0, 30.0, TOLERANCE)
@@ -177,7 +195,6 @@ pub fn assert_transform_algebra<B: GeometryBackend>(backend: &B) {
         .expect("box construction should succeed")
         .shape;
 
-    // Translation identity.
     let identity_translation = backend
         .translate(&solid, 0.0, 0.0, 0.0, TOLERANCE)
         .expect("zero translation should succeed")
@@ -187,7 +204,6 @@ pub fn assert_transform_algebra<B: GeometryBackend>(backend: &B) {
         backend.bounding_box(&solid, TOLERANCE).unwrap(),
     );
 
-    // Translation composition: T(a) then T(b) == T(a+b).
     let first = backend
         .translate(&solid, 11.0, -7.0, 3.0, TOLERANCE)
         .expect("first translation should succeed")
@@ -205,7 +221,6 @@ pub fn assert_transform_algebra<B: GeometryBackend>(backend: &B) {
         backend.bounding_box(&direct, TOLERANCE).unwrap(),
     );
 
-    // Zero-angle rotation is identity.
     let identity_rotation = backend
         .rotate(&solid, 0.0, 0.0, 1.0, 0.0, TOLERANCE)
         .expect("zero-angle rotation should succeed")
@@ -215,7 +230,6 @@ pub fn assert_transform_algebra<B: GeometryBackend>(backend: &B) {
         backend.bounding_box(&solid, TOLERANCE).unwrap(),
     );
 
-    // A full revolution is identity for the measured geometry.
     let full_rotation = backend
         .rotate(
             &solid,
@@ -232,7 +246,6 @@ pub fn assert_transform_algebra<B: GeometryBackend>(backend: &B) {
         backend.bounding_box(&solid, TOLERANCE).unwrap(),
     );
 
-    // Transform algebra must preserve validation.
     assert_eq!(backend.validate(&sequential, TOLERANCE).unwrap(), ValidationResult {
         valid: true,
         manifold: true,
@@ -354,6 +367,11 @@ mod tests {
     #[test]
     fn occt_bounding_box_contract() {
         assert_bounding_box_contract(&OcctBackend::new());
+    }
+
+    #[test]
+    fn occt_topology_counts_contract() {
+        assert_topology_counts_contract(&OcctBackend::new());
     }
 
     #[test]
