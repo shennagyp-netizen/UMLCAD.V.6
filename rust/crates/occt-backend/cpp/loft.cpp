@@ -1,8 +1,11 @@
 #include "bridge.hpp"
+#include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakePolygon.hxx>
-#include <BRepOffsetAPI_ThruSections.hxx>
-#include <TopoDS_Wire.hxx>
+#include <BRepBuilderAPI_MakeSolid.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
+#include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <TopoDS_Shell.hxx>
 #include <gp_Pnt.hxx>
 #include <cmath>
 #include <new>
@@ -17,8 +20,10 @@ bool validSection(const double* xy,uint32_t count,double z){
     long double area=0.0L;for(uint32_t i=0;i<count;++i){uint32_t j=(i+1)%count;area+=static_cast<long double>(xy[2*i])*xy[2*j+1]-static_cast<long double>(xy[2*j])*xy[2*i+1];}
     return std::abs(area)>1e-18L;
 }
-TopoDS_Wire makeWire(const double* xy,uint32_t count,double z,bool& done){
-    BRepBuilderAPI_MakePolygon builder;for(uint32_t i=0;i<count;++i)builder.Add(gp_Pnt(xy[2*i],xy[2*i+1],z));builder.Close();done=builder.IsDone();return done?builder.Wire():TopoDS_Wire();
+TopoDS_Face makePlanarFace(const std::vector<gp_Pnt>& points,bool& done){
+    BRepBuilderAPI_MakePolygon builder;for(const gp_Pnt& point:points)builder.Add(point);builder.Close();
+    if(!builder.IsDone()){done=false;return TopoDS_Face();}
+    BRepBuilderAPI_MakeFace face_builder(builder.Wire());done=face_builder.IsDone();return done?face_builder.Face():TopoDS_Face();
 }
 }
 
@@ -26,10 +31,25 @@ extern "C" int32_t umlcad_occt_loft_polygons(const double* lower_xy,uint32_t low
     if(out_shape==nullptr||lower_xy==nullptr||upper_xy==nullptr)return UMLCAD_OCCT_INVALID_ARGUMENT;*out_shape=nullptr;
     if(lower_count!=upper_count||lower_count<3||lower_z==upper_z||!validSection(lower_xy,lower_count,lower_z)||!validSection(upper_xy,upper_count,upper_z))return UMLCAD_OCCT_INVALID_ARGUMENT;
     try{
-        bool lower_done=false,upper_done=false;TopoDS_Wire lower=makeWire(lower_xy,lower_count,lower_z,lower_done);TopoDS_Wire upper=makeWire(upper_xy,upper_count,upper_z,upper_done);
-        if(!lower_done||!upper_done)return UMLCAD_OCCT_CONSTRUCTION_FAILED;
-        BRepOffsetAPI_ThruSections loft(true,true);loft.AddWire(lower);loft.AddWire(upper);loft.Build();if(!loft.IsDone())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
-        TopoDS_Shape shape=loft.Shape();if(shape.IsNull())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
+        std::vector<gp_Pnt> lower,upper;lower.reserve(lower_count);upper.reserve(upper_count);
+        for(uint32_t i=0;i<lower_count;++i) lower.emplace_back(lower_xy[2*i],lower_xy[2*i+1],lower_z);
+        for(uint32_t i=0;i<upper_count;++i) upper.emplace_back(upper_xy[2*i],upper_xy[2*i+1],upper_z);
+
+        BRepBuilderAPI_Sewing sewing;
+        sewing.SetTolerance(1e-12);
+        bool done=false;
+        TopoDS_Face lower_face=makePlanarFace(lower,done);if(!done)return UMLCAD_OCCT_CONSTRUCTION_FAILED;sewing.Add(lower_face);
+        std::vector<gp_Pnt> reversed_upper=upper;std::reverse(reversed_upper.begin(),reversed_upper.end());
+        TopoDS_Face upper_face=makePlanarFace(reversed_upper,done);if(!done)return UMLCAD_OCCT_CONSTRUCTION_FAILED;sewing.Add(upper_face);
+        for(uint32_t i=0;i<lower_count;++i){uint32_t j=(i+1)%lower_count;std::vector<gp_Pnt> side{lower[i],lower[j],upper[j],upper[i]};TopoDS_Face side_face=makePlanarFace(side,done);if(!done)return UMLCAD_OCCT_CONSTRUCTION_FAILED;sewing.Add(side_face);}
+        sewing.Perform();
+        TopoDS_Shape sewed=sewing.SewedShape();
+        if(sewed.IsNull())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
+        TopoDS_Shell shell;
+        for(TopExp_Explorer explorer(sewed,TopAbs_SHELL);explorer.More();explorer.Next()){shell=TopoDS::Shell(explorer.Current());break;}
+        if(shell.IsNull())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
+        BRepBuilderAPI_MakeSolid solid_builder(shell);if(!solid_builder.IsDone())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
+        TopoDS_Shape shape=solid_builder.Solid();if(shape.IsNull())return UMLCAD_OCCT_CONSTRUCTION_FAILED;
         auto* result=new(std::nothrow) umlcad_occt_shape{shape};if(!result)return UMLCAD_OCCT_INTERNAL_ERROR;*out_shape=result;return UMLCAD_OCCT_OK;
     }catch(...){return UMLCAD_OCCT_INTERNAL_ERROR;}
 }
