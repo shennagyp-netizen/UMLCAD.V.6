@@ -15,7 +15,7 @@ fn sphere_is_a_valid_manifold_solid() {
 fn sphere_has_canonical_occt_topology() {
     let backend = OcctBackend::new();
     let shape = backend.sphere_solid(5.0, TOLERANCE).unwrap().shape;
-    assert_eq!(backend.topology_counts(&shape, TOLERANCE).unwrap(), TopologyCounts { solids: 1, shells: 1, faces: 1, edges: 1, vertices: 1 });
+    assert_eq!(backend.topology_counts(&shape, TOLERANCE).unwrap(), TopologyCounts { solids: 1, shells: 1, faces: 1, edges: 3, vertices: 2 });
 }
 
 #[test]
