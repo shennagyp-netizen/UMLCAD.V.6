@@ -16,9 +16,25 @@ target_include_directories(umlcad_occt_bridge
         ${OpenCASCADE_INCLUDE_DIR}
 )
 
+target_link_directories(umlcad_occt_bridge
+    PRIVATE
+        ${OpenCASCADE_LIBRARY_DIR}
+)
+
+# Keep the reference bridge deliberately narrow. The Ubuntu OpenCASCADE
+# package exports a global library list containing optional toolkits that this
+# bridge does not use (STEP, XDE, Draw, visualization, etc.).
 target_link_libraries(umlcad_occt_bridge
     PRIVATE
-        ${OpenCASCADE_LIBRARIES}
+        TKPrim
+        TKTopAlgo
+        TKBRep
+        TKGeomAlgo
+        TKGeomBase
+        TKG3d
+        TKG2d
+        TKMath
+        TKernel
 )
 
 set_target_properties(umlcad_occt_bridge PROPERTIES
