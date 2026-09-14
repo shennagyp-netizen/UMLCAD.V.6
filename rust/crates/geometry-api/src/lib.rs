@@ -1,0 +1,122 @@
+use core::fmt;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GeometryStatus {
+    Success,
+    InvalidInput,
+    BackendFailure,
+    TopologyInvalid,
+    Ambiguous,
+    Indeterminate,
+    Unsupported,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GeometryKind {
+    Solid,
+    Surface,
+    Curve,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ToleranceContext {
+    pub modeling: f64,
+    pub validation: f64,
+}
+
+impl ToleranceContext {
+    pub fn validate(self) -> Result<(), GeometryError> {
+        if !self.modeling.is_finite() || !self.validation.is_finite() {
+            return Err(GeometryError::InvalidTolerance);
+        }
+        if self.modeling < 0.0 || self.validation < 0.0 {
+            return Err(GeometryError::InvalidTolerance);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GeometryEvidence {
+    pub status: GeometryStatus,
+    pub backend: &'static str,
+    pub tolerance: ToleranceContext,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum GeometryError {
+    InvalidTolerance,
+    InvalidInput(&'static str),
+    Unsupported(&'static str),
+}
+
+impl fmt::Display for GeometryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidTolerance => write!(f, "invalid tolerance context"),
+            Self::InvalidInput(v) => write!(f, "invalid input: {v}"),
+            Self::Unsupported(v) => write!(f, "unsupported: {v}"),
+        }
+    }
+}
+
+pub trait GeometryBackend {
+    type Shape: Clone;
+
+    fn backend_name(&self) -> &'static str;
+
+    fn box_solid(
+        &self,
+        width: f64,
+        depth: f64,
+        height: f64,
+        tolerance: ToleranceContext,
+    ) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+
+    fn translate(
+        &self,
+        shape: &Self::Shape,
+        dx: f64,
+        dy: f64,
+        dz: f64,
+    ) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+
+    fn validate(
+        &self,
+        shape: &Self::Shape,
+        tolerance: ToleranceContext,
+    ) -> Result<ValidationResult, GeometryError>;
+}
+
+#[derive(Clone, Debug)]
+pub struct GeometryResult<S> {
+    pub shape: S,
+    pub kind: GeometryKind,
+    pub evidence: GeometryEvidence,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ValidationResult {
+    pub valid: bool,
+    pub manifold: bool,
+    pub message: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tolerance_must_be_finite_and_non_negative() {
+        assert!(ToleranceContext { modeling: 0.0, validation: 1e-9 }.validate().is_ok());
+        assert_eq!(
+            ToleranceContext { modeling: -1.0, validation: 0.0 }.validate(),
+            Err(GeometryError::InvalidTolerance)
+        );
+        assert_eq!(
+            ToleranceContext { modeling: f64::NAN, validation: 0.0 }.validate(),
+            Err(GeometryError::InvalidTolerance)
+        );
+    }
+}
