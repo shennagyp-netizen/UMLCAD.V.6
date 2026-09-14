@@ -13,6 +13,7 @@ int32_t umlcad_occt_extrude_polygon(const double* points_xy,uint32_t point_count
 int32_t umlcad_occt_revolve_polygon(const double* profile_rz,uint32_t point_count,double angle_radians,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_loft_polygons(const double* lower_xy,uint32_t lower_count,double lower_z,const double* upper_xy,uint32_t upper_count,double upper_z,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_fillet_all_edges(const umlcad_occt_shape* input,double radius,umlcad_occt_shape** out_shape);
+int32_t umlcad_occt_chamfer_all_edges(const umlcad_occt_shape* input,double distance,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_fuse(const umlcad_occt_shape* left,const umlcad_occt_shape* right,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_common(const umlcad_occt_shape* left,const umlcad_occt_shape* right,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_cut(const umlcad_occt_shape* left,const umlcad_occt_shape* right,umlcad_occt_shape** out_shape);
