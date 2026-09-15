@@ -1,0 +1,65 @@
+#include <GeomAPI_IntCS.hxx>
+#include <Geom_BSplineSurface.hxx>
+#include <Geom_Line.hxx>
+#include <TColStd_Array1OfInteger.hxx>
+#include <TColStd_Array1OfReal.hxx>
+#include <TColStd_Array2OfReal.hxx>
+#include <TColgp_Array2OfPnt.hxx>
+#include <gp_Dir.hxx>
+#include <gp_Lin.hxx>
+#include <gp_Pnt.hxx>
+
+#include <cmath>
+#include <cstdint>
+#include <new>
+#include <vector>
+
+struct umlcad_occt_shape { TopoDS_Shape value; };
+
+namespace {
+struct KnotData { std::vector<double> values; std::vector<int> multiplicities; };
+KnotData distinctKnots(const double* knots, uint32_t count) {
+    KnotData out;
+    for (uint32_t i=0;i<count;++i) {
+        if (i==0 || knots[i]!=knots[i-1]) { out.values.push_back(knots[i]); out.multiplicities.push_back(1); }
+        else { ++out.multiplicities.back(); }
+    }
+    return out;
+}
+Handle(Geom_BSplineSurface) buildSurface(const double* poles_xyz,uint32_t count_u,uint32_t count_v,const double* weights,const double* knots_u,uint32_t knot_count_u,const double* knots_v,uint32_t knot_count_v,uint32_t degree_u,uint32_t degree_v) {
+    TColgp_Array2OfPnt poles(1,static_cast<Standard_Integer>(count_u),1,static_cast<Standard_Integer>(count_v));
+    TColStd_Array2OfReal ws(1,static_cast<Standard_Integer>(count_u),1,static_cast<Standard_Integer>(count_v));
+    for(uint32_t u=0;u<count_u;++u) for(uint32_t v=0;v<count_v;++v){const uint64_t i=static_cast<uint64_t>(u)*count_v+v;poles.SetValue(static_cast<Standard_Integer>(u+1),static_cast<Standard_Integer>(v+1),gp_Pnt(poles_xyz[3*i],poles_xyz[3*i+1],poles_xyz[3*i+2]));ws.SetValue(static_cast<Standard_Integer>(u+1),static_cast<Standard_Integer>(v+1),weights[i]);}
+    const KnotData U=distinctKnots(knots_u,knot_count_u), V=distinctKnots(knots_v,knot_count_v);
+    TColStd_Array1OfReal uk(1,static_cast<Standard_Integer>(U.values.size())); TColStd_Array1OfInteger um(1,static_cast<Standard_Integer>(U.values.size()));
+    TColStd_Array1OfReal vk(1,static_cast<Standard_Integer>(V.values.size())); TColStd_Array1OfInteger vm(1,static_cast<Standard_Integer>(V.values.size()));
+    for(std::size_t i=0;i<U.values.size();++i){uk.SetValue(static_cast<Standard_Integer>(i+1),U.values[i]);um.SetValue(static_cast<Standard_Integer>(i+1),U.multiplicities[i]);}
+    for(std::size_t i=0;i<V.values.size();++i){vk.SetValue(static_cast<Standard_Integer>(i+1),V.values[i]);vm.SetValue(static_cast<Standard_Integer>(i+1),V.multiplicities[i]);}
+    return new Geom_BSplineSurface(poles,ws,uk,vk,um,vm,static_cast<Standard_Integer>(degree_u),static_cast<Standard_Integer>(degree_v),Standard_False,Standard_False);
+}
+bool valid(const double* p,uint32_t cu,uint32_t cv,const double* w,const double* ku,uint32_t nu,const double* kv,uint32_t nv,uint32_t du,uint32_t dv,const double* s,const double* e,double tol){
+    if(!p||!w||!ku||!kv||!s||!e||du==0||dv==0||cu<du+1||cv<dv+1||nu!=cu+du+1||nv!=cv+dv+1||!std::isfinite(tol)||tol<0)return false;
+    const uint64_t n=static_cast<uint64_t>(cu)*cv; for(uint64_t i=0;i<3*n;++i)if(!std::isfinite(p[i]))return false; for(uint64_t i=0;i<n;++i)if(!std::isfinite(w[i])||w[i]<=0)return false;
+    for(uint32_t i=0;i<nu;++i)if(!std::isfinite(ku[i])||(i&&ku[i]<ku[i-1]))return false; for(uint32_t i=0;i<nv;++i)if(!std::isfinite(kv[i])||(i&&kv[i]<kv[i-1]))return false;
+    const double u0=ku[du],u1=ku[cu],v0=kv[dv],v1=kv[cv]; if(!(u1>u0)||!(v1>v0))return false;
+    if(!std::isfinite(s[0])||!std::isfinite(s[1])||!std::isfinite(s[2])||!std::isfinite(e[0])||!std::isfinite(e[1])||!std::isfinite(e[2]))return false;
+    return true;
+}
+}
+
+extern "C" int32_t umlcad_occt_line_surface_intersection(
+    const double* poles_xyz,uint32_t count_u,uint32_t count_v,const double* weights,const double* knots_u,uint32_t knot_count_u,const double* knots_v,uint32_t knot_count_v,uint32_t degree_u,uint32_t degree_v,const double* start_xyz,const double* end_xyz,double tolerance,double* out_values,uint32_t capacity,uint32_t* out_count,int32_t* out_tangent){
+    if(!out_values||!out_count||!out_tangent)return 1;*out_count=0;*out_tangent=0;
+    if(!valid(poles_xyz,count_u,count_v,weights,knots_u,knot_count_u,knots_v,knot_count_v,degree_u,degree_v,start_xyz,end_xyz,tolerance))return 1;
+    try{
+        const Handle(Geom_BSplineSurface) surface=buildSurface(poles_xyz,count_u,count_v,weights,knots_u,knot_count_u,knots_v,knot_count_v,degree_u,degree_v); if(surface.IsNull())return 3;
+        gp_Vec delta(gp_Pnt(start_xyz[0],start_xyz[1],start_xyz[2]),gp_Pnt(end_xyz[0],end_xyz[1],end_xyz[2])); if(delta.SquareMagnitude()<=1e-30)return 1;
+        const gp_Pnt origin(start_xyz[0],start_xyz[1],start_xyz[2]); const gp_Dir direction(delta); const Handle(Geom_Line) line=new Geom_Line(gp_Lin(origin,direction));
+        GeomAPI_IntCS inter(line,surface); if(!inter.IsDone())return 4;
+        if(inter.NbSegments()>0){*out_tangent=1;return 0;}
+        const double dx=delta.X(),dy=delta.Y(),dz=delta.Z(),den=dx*dx+dy*dy+dz*dz;
+        uint32_t written=0;
+        for(int i=1;i<=inter.NbPoints();++i){if(written>=capacity)return 1;double u=0,v=0,w=0;inter.Parameters(i,u,v,w);const gp_Pnt& p=inter.Point(i);const double t=((p.X()-start_xyz[0])*dx+(p.Y()-start_xyz[1])*dy+(p.Z()-start_xyz[2])*dz)/den;if(t < -tolerance || t > 1.0+tolerance)continue;const uint32_t o=6*written;out_values[o]=u;out_values[o+1]=v;out_values[o+2]=t;out_values[o+3]=p.X();out_values[o+4]=p.Y();out_values[o+5]=p.Z();++written;}
+        *out_count=written;return 0;
+    }catch(...){return 5;}
+}
