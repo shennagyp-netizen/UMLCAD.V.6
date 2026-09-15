@@ -72,7 +72,7 @@ pub trait NurbsSurfaceDifferentialBackend: NurbsSurfaceBackend { fn nurbs_surfac
 #[derive(Clone, Copy)] struct Homogeneous { xw: f64, yw: f64, zw: f64, w: f64 }
 impl Homogeneous { const fn zero() -> Self { Self { xw: 0.0, yw: 0.0, zw: 0.0, w: 0.0 } } fn add(self, o: Self) -> Self { Self { xw: self.xw+o.xw, yw: self.yw+o.yw, zw: self.zw+o.zw, w: self.w+o.w } } fn scale(self, s: f64) -> Self { Self { xw: self.xw*s, yw: self.yw*s, zw: self.zw*s, w: self.w*s } } }
 fn knot_continuity_order(t: f64, degree: usize, knots: &[f64], count: usize) -> usize { let m = knots.iter().filter(|k| **k == t).count(); if t == knots[degree] || t == knots[count] { degree } else { degree.saturating_sub(m) } }
-fn require_second_order_continuity(t: f64, degree: usize, knots: &[f64], count: usize) -> Result<(), NurbsSurfaceEvaluationError> { if degree < 2 || (t != knots[degree] && t != knots[count] && knot_continuity_order(t, degree, knots, count) < 2) { return Ok(()); } Ok(()) }
+fn require_second_order_continuity(t: f64, degree: usize, knots: &[f64], count: usize) -> Result<(), NurbsSurfaceEvaluationError> { if degree < 2 { return Ok(()); } if t != knots[degree] && t != knots[count] && knot_continuity_order(t, degree, knots, count) < 2 { return Err(NurbsSurfaceEvaluationError::InsufficientContinuity); } Ok(()) }
 fn basis_derivatives(t: f64, degree: usize, knots: &[f64], count: usize) -> Vec<[f64;3]> { (0..count).map(|i| [basis_derivative_recursive(i,degree,t,knots,0),basis_derivative_recursive(i,degree,t,knots,1),basis_derivative_recursive(i,degree,t,knots,2)]).collect() }
 fn basis_derivative_recursive(i: usize, p: usize, t: f64, k: &[f64], order: usize) -> f64 {
     if order > p { return 0.0; }
