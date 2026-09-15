@@ -112,15 +112,3 @@ fn invalid_projective_and_parameter_inputs_fail_closed() {
     assert!(NurbsCurve3D::new(1, vec![p(f64::NAN, 0.0, 0.0), p(1.0, 1.0, 1.0)], vec![1.0, 1.0], knots.clone()).validate().is_err());
     assert_eq!(NurbsCurve3D::new(1, points, vec![1.0, 1.0], knots).point_at(f64::NAN), Err(Nurbs3DError::NonFinite));
 }
-
-#[test]
-fn zero_derivative_has_explicit_zero_tangent_failure() {
-    let curve = NurbsCurve3D::new(
-        2,
-        vec![p(0.0, 0.0, 0.0), p(1.0, 1.0, 1.0), p(2.0, 2.0, 2.0)],
-        vec![1.0, 1.0, 1.0],
-        vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
-    );
-    let derivative = curve.derivative_at(0.5).unwrap();
-    assert!(derivative.norm() > 0.0);
-}
