@@ -1,4 +1,4 @@
-use super::{NurbsSurface3DDefinition, ParameterDomain, Point3};
+use super::{NurbsSurface3DDefinition, ParameterDomain};
 use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryResult, ToleranceContext};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -221,10 +221,10 @@ mod tests {
         NurbsSurface3DDefinition::new(
             (1, 1),
             vec![
-                Point3 { x: 0.0, y: 0.0, z: 0.0 },
-                Point3 { x: 0.0, y: 1.0, z: 0.0 },
-                Point3 { x: 1.0, y: 0.0, z: 0.0 },
-                Point3 { x: 1.0, y: 1.0, z: 0.0 },
+                super::super::Point3 { x: 0.0, y: 0.0, z: 0.0 },
+                super::super::Point3 { x: 0.0, y: 1.0, z: 0.0 },
+                super::super::Point3 { x: 1.0, y: 0.0, z: 0.0 },
+                super::super::Point3 { x: 1.0, y: 1.0, z: 0.0 },
             ],
             vec![1.0; 4],
             (2, 2),
@@ -279,14 +279,14 @@ mod tests {
     #[test]
     fn hole_outside_outer_loop_is_rejected() {
         let hole = TrimLoop2D::new(vec![
-            ParameterPoint2 { u: 1.1, v: 0.1 },
-            ParameterPoint2 { u: 1.1, v: 0.2 },
-            ParameterPoint2 { u: 1.2, v: 0.2 },
-            ParameterPoint2 { u: 1.2, v: 0.1 },
+            ParameterPoint2 { u: 1.0, v: 0.1 },
+            ParameterPoint2 { u: 1.0, v: 0.2 },
+            ParameterPoint2 { u: 0.9, v: 0.2 },
+            ParameterPoint2 { u: 0.9, v: 0.1 },
         ]);
         assert_eq!(
             TrimmedNurbsSurface3DDefinition::new(plane(), vec![outer(), hole]).validate(),
-            Err(TrimmedSurfaceDefinitionError::LoopOutOfDomain)
+            Err(TrimmedSurfaceDefinitionError::HoleOutsideOuter)
         );
     }
 }
