@@ -101,6 +101,14 @@ fn line_circle_intersections(l: Line, c: Circle) -> Vec<Point> {
     out
 }
 
+fn closest_arc_point(a: Arc, p: Point) -> Point {
+    let radial = p.sub(a.center);
+    let n = radial.norm();
+    if n <= EPSILON { return a.start_point(); }
+    let q = Point { x: a.center.x + radial.x * a.radius / n, y: a.center.y + radial.y * a.radius / n };
+    if a.contains_point(q) { q } else if a.start_point().distance(p) <= a.end_point().distance(p) { a.start_point() } else { a.end_point() }
+}
+
 fn arc_point(a: Arc, t: f64) -> Point { Geometry::Arc(a).point_at(t) }
 fn arc_distance(a: Arc, p: Point) -> f64 { Geometry::Arc(a).distance_to_point(p) }
 fn point_on_arc(a: Arc, p: Point) -> bool { a.contains_point(p) }
@@ -108,19 +116,17 @@ fn point_on_arc(a: Arc, p: Point) -> bool { a.contains_point(p) }
 fn line_arc(l: Line, a: Arc) -> f64 {
     let circle = Circle { center: a.center, radius: a.radius };
     if line_circle_intersections(l, circle).into_iter().any(|p| point_on_arc(a, p)) { return 0.0; }
-    let q = closest(l, a.center);
-    let radial = q.sub(a.center);
-    let radial_norm = radial.norm();
-    let radial_candidate = if radial_norm > EPSILON { Some(Point { x: a.center.x + radial.x * a.radius / radial_norm, y: a.center.y + radial.y * a.radius / radial_norm }) } else { None };
+    let radial_candidate = closest_arc_point(a, closest(l, a.center));
     let mut d = l.start.distance(arc_point(a, 0.0)).min(l.end.distance(arc_point(a, 1.0)));
     d = d.min(arc_distance(a, l.start)).min(arc_distance(a, l.end));
-    if let Some(p) = radial_candidate { if point_on_arc(a, p) { d = d.min(l.point_distance(p)); } }
-    d.min(line_circle(l, circle))
+    if point_on_arc(a, radial_candidate) { d = d.min(l.start.distance(radial_candidate).min(l.end.distance(radial_candidate)).min(line_circle(l, circle))); }
+    d
 }
 
 fn arc_circle(a: Arc, c: Circle) -> f64 {
     if circle_circle_intersections(Circle { center: a.center, radius: a.radius }, c).into_iter().any(|p| point_on_arc(a, p)) { return 0.0; }
-    arc_distance(a, c.center).abs_sub(c.radius).abs()
+    let q = closest_arc_point(a, c.center);
+    (q.distance(c.center) - c.radius).abs()
 }
 
 fn arc_arc(a: Arc, b: Arc) -> f64 {
@@ -128,16 +134,12 @@ fn arc_arc(a: Arc, b: Arc) -> f64 {
     let cb = Circle { center: b.center, radius: b.radius };
     if circle_circle_intersections(ca, cb).into_iter().any(|p| point_on_arc(a, p) && point_on_arc(b, p)) { return 0.0; }
     let mut d = f64::INFINITY;
-    for p in [arc_point(a, 0.0), arc_point(a, 1.0), arc_point(b, 0.0), arc_point(b, 1.0)] {
-        d = d.min(arc_distance(a, p)).min(arc_distance(b, p));
-    }
-    let pa = Geometry::Arc(a).distance_to_point(b.center);
-    let pb = Geometry::Arc(b).distance_to_point(a.center);
-    d.min((pa.powi(2) + pb.powi(2) - 2.0 * pa * pb).abs().sqrt())
+    for p in [arc_point(a, 0.0), arc_point(a, 1.0)] { d = d.min(arc_distance(b, p)); }
+    for p in [arc_point(b, 0.0), arc_point(b, 1.0)] { d = d.min(arc_distance(a, p)); }
+    let pa = closest_arc_point(a, b.center);
+    let pb = closest_arc_point(b, a.center);
+    d.min(pa.distance(pb))
 }
-
-trait PointLineDistance { fn point_distance(self, p: Point) -> f64; }
-impl PointLineDistance for Line { fn point_distance(self, p: Point) -> f64 { p.distance(closest(self, p)) } }
 
 fn pair_distance(a: &Geometry, b: &Geometry) -> f64 {
     match (a, b) {
