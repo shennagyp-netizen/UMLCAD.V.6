@@ -22,8 +22,8 @@ fn circle_curve_has_expected_bounds() {
     assert!((bounds.max_x - 10.0).abs() <= T.validation);
     assert!((bounds.min_y + 10.0).abs() <= T.validation);
     assert!((bounds.max_y - 10.0).abs() <= T.validation);
-    assert!((bounds.min_z).abs() <= T.validation);
-    assert!((bounds.max_z).abs() <= T.validation);
+    assert!(bounds.min_z.abs() <= T.validation);
+    assert!(bounds.max_z.abs() <= T.validation);
 }
 
 #[test]
@@ -35,13 +35,15 @@ fn circle_curve_rejects_invalid_radius() {
 }
 
 #[test]
-fn circle_curve_is_deterministic_and_immutable() {
+fn circle_curve_transform_preserves_curve_kind_and_source_immutability() {
     let backend = OcctBackend::new();
-    let source = backend.circle_curve(10.0, T).unwrap().shape;
+    let source_result = backend.circle_curve(10.0, T).unwrap();
+    let source = source_result.shape;
+    let before = backend.bounding_box(&source, T).unwrap();
     let first = backend.translate(&source, 20.0, -30.0, 40.0, T).unwrap();
     let second = backend.translate(&source, 20.0, -30.0, 40.0, T).unwrap();
-    assert_eq!(first.kind, GeometryKind::Solid);
-    assert_eq!(second.kind, GeometryKind::Solid);
+    assert_eq!(first.kind, GeometryKind::Curve);
+    assert_eq!(second.kind, GeometryKind::Curve);
     assert_eq!(backend.bounding_box(&first.shape, T).unwrap(), backend.bounding_box(&second.shape, T).unwrap());
-    assert_eq!(backend.bounding_box(&source, T).unwrap(), backend.bounding_box(&backend.circle_curve(10.0, T).unwrap().shape, T).unwrap());
+    assert_eq!(before, backend.bounding_box(&source, T).unwrap());
 }
