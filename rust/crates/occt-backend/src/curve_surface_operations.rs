@@ -5,7 +5,7 @@ use umlcad_v6_surface_operations_api::{
     LineSurfaceIntersectionResult,
 };
 
-use crate::{NativeShape, OcctBackend, OCCT_OK};
+use crate::{OcctBackend, OCCT_OK};
 
 unsafe extern "C" {
     fn umlcad_occt_line_surface_intersection(
@@ -94,7 +94,7 @@ impl CurveSurfaceOperations for OcctBackend {
         let native: Vec<LineSurfaceIntersectionPoint> = (0..count as usize)
             .map(|i| {
                 let offset = 6 * i;
-                let point = Point3 {
+                let point = umlcad_v6_nurbs_surface_api::Point3 {
                     x: values[offset + 3],
                     y: values[offset + 4],
                     z: values[offset + 5],
@@ -135,5 +135,3 @@ impl CurveSurfaceOperations for OcctBackend {
         Ok(LineSurfaceIntersectionResult { status, points: native })
     }
 }
-
-use umlcad_v6_nurbs_surface_api::Point3;
