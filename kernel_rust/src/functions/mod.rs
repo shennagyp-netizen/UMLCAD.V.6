@@ -4,6 +4,7 @@ pub mod dimensions;
 pub mod dxf;
 pub mod engineering;
 pub mod geometry;
+pub mod offsets;
 pub mod relations;
 pub mod snapshot;
 pub mod solver;
