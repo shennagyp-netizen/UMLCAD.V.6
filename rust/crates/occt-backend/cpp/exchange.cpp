@@ -10,7 +10,7 @@
 #include <TopoDS_Shape.hxx>
 
 #include <cstdint>
-#include <cstring>
+#include <new>
 
 struct umlcad_occt_shape { TopoDS_Shape value; };
 
