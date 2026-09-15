@@ -1,4 +1,5 @@
 pub mod constraints;
+pub mod curves3d;
 pub mod diagnostics;
 pub mod dimensions;
 pub mod dxf;
