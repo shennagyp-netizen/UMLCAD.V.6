@@ -33,6 +33,7 @@ pub struct NurbsSurface3DDefinition {
 }
 
 impl NurbsSurface3DDefinition {
+    /// `degrees` is `(degree_u, degree_v)` and `counts` is `(count_u, count_v)`.
     pub fn new(
         degrees: Degrees,
         control_points: Vec<Point3>,
