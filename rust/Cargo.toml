@@ -4,5 +4,6 @@ members = [
     "crates/geometry-api",
     "crates/geometry-contract-tests",
     "crates/freeform-api",
+    "crates/nurbs-surface-api",
     "crates/occt-backend",
 ]
