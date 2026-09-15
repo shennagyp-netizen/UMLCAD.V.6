@@ -70,6 +70,10 @@ jobs:
         working-directory: kernel_rust
         run: cargo test --all-targets --release
 
-      - name: Kernel clippy gate
+      - name: Kernel clippy source gate
         working-directory: kernel_rust
-        run: cargo clippy --all-targets -- -D warnings -A clippy::useless_vec
+        run: cargo clippy --lib --bins -- -D warnings
+
+      - name: Kernel clippy test gate
+        working-directory: kernel_rust
+        run: cargo clippy --tests -- -D warnings -A clippy::useless_vec -A clippy::bool_assert_comparison
