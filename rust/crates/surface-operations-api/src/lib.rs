@@ -1,6 +1,7 @@
 use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceEvaluationError, Point3};
 
 mod curve_split;
+mod planar_line_surface;
 mod point_surface;
 mod surface_surface;
 pub use curve_split::{split_line_segment_at_intersections, SplitLineSegmentError, SplitLineSegmentResult};
@@ -116,6 +117,9 @@ pub fn intersect_line_segment_nurbs_surface(
     surface
         .validate()
         .map_err(|_| LineSurfaceIntersectionError::InvalidSurface)?;
+    if let Some(result) = planar_line_surface::classify_planar_line_surface(line, surface, tolerance)? {
+        return Ok(result);
+    }
     let ((u0, u1), (v0, v1)) = surface
         .parameter_domain()
         .map_err(|_| LineSurfaceIntersectionError::InvalidSurface)?;
