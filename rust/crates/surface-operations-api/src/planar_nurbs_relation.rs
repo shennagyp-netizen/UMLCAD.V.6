@@ -41,7 +41,7 @@ pub fn classify_planar_nurbs_surface_relation(
         .max(plane.origin.norm());
     let tol = tolerance.max(1e-12 * scale);
 
-    if distances.iter().all(|d| d > tol) || distances.iter().all(|d| d < -tol) {
+    if distances.iter().all(|d| *d > tol) || distances.iter().all(|d| *d < -tol) {
         Ok(PlanarNurbsSurfaceRelation::DisjointCertified)
     } else if distances.iter().all(|d| d.abs() <= tol) {
         Ok(PlanarNurbsSurfaceRelation::CoincidentWithinTolerance)
