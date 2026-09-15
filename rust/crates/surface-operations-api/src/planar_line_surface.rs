@@ -1,5 +1,21 @@
 use super::*;
 
+fn sub(a: Point3, b: Point3) -> Point3 {
+    Point3 {
+        x: a.x - b.x,
+        y: a.y - b.y,
+        z: a.z - b.z,
+    }
+}
+
+fn affine(a: Point3, b: Point3, t: f64) -> Point3 {
+    Point3 {
+        x: a.x + b.x * t,
+        y: a.y + b.y * t,
+        z: a.z + b.z * t,
+    }
+}
+
 fn is_exact_affine_planar_patch(surface: &NurbsSurface3DDefinition) -> Option<PlanarPatch> {
     if surface.degree_u != 1
         || surface.degree_v != 1
@@ -14,9 +30,13 @@ fn is_exact_affine_planar_patch(surface: &NurbsSurface3DDefinition) -> Option<Pl
     let p01 = surface.control_points[1];
     let p10 = surface.control_points[2];
     let p11 = surface.control_points[3];
-    let du = p10 - p00;
-    let dv = p01 - p00;
-    let closure = p11 - (p00 + du + dv);
+    let du = sub(p10, p00);
+    let dv = sub(p01, p00);
+    let closure = sub(sub(p11, p00), Point3 {
+        x: du.x + dv.x,
+        y: du.y + dv.y,
+        z: du.z + dv.z,
+    });
     if closure.norm() > 1e-12 * du.norm().max(dv.norm()).max(1.0) {
         return None;
     }
@@ -47,7 +67,7 @@ struct PlanarPatch {
     v1: f64,
 }
 
-fn classify_planar_line_surface(
+pub(super) fn classify_planar_line_surface(
     line: LineSegment3D,
     surface: &NurbsSurface3DDefinition,
     tolerance: f64,
@@ -55,7 +75,7 @@ fn classify_planar_line_surface(
     let Some(patch) = is_exact_affine_planar_patch(surface) else {
         return Ok(None);
     };
-    let direction = line.end - line.start;
+    let direction = sub(line.end, line.start);
     let normal_norm = patch.normal.norm();
     let direction_norm = direction.norm();
     let scale = direction_norm
@@ -66,7 +86,7 @@ fn classify_planar_line_surface(
     let tol_dist = tolerance.max(1e-12 * scale);
     let denominator = patch.normal.dot(direction);
     let parallel_bound = tol_dist * normal_norm * direction_norm;
-    let offset = patch.normal.dot(line.start - patch.origin);
+    let offset = patch.normal.dot(sub(line.start, patch.origin));
 
     if denominator.abs() <= parallel_bound {
         if offset.abs() <= tol_dist * normal_norm {
@@ -90,8 +110,8 @@ fn classify_planar_line_surface(
         }));
     }
     let t = t.clamp(0.0, 1.0);
-    let point = line.start + direction * t;
-    let rhs = point - patch.origin;
+    let point = affine(line.start, direction, t);
+    let rhs = sub(point, patch.origin);
     let aa = patch.du.dot(patch.du);
     let ab = patch.du.dot(patch.dv);
     let bb = patch.dv.dot(patch.dv);
@@ -129,35 +149,6 @@ fn classify_planar_line_surface(
             point,
         }],
     }))
-}
-
-trait PointAlgebra {
-    fn add(self, other: Self) -> Self;
-    fn sub(self, other: Self) -> Self;
-}
-
-impl PointAlgebra for Point3 {
-    fn add(self, other: Self) -> Self {
-        Point3 { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
-    }
-    fn sub(self, other: Self) -> Self {
-        Point3 { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z }
-    }
-}
-
-use std::ops::{Add, Mul, Sub};
-
-impl Add for Point3 {
-    type Output = Self;
-    fn add(self, rhs: Self) -> Self { PointAlgebra::add(self, rhs) }
-}
-impl Sub for Point3 {
-    type Output = Self;
-    fn sub(self, rhs: Self) -> Self { PointAlgebra::sub(self, rhs) }
-}
-impl Mul<f64> for Point3 {
-    type Output = Self;
-    fn mul(self, rhs: f64) -> Self { Point3 { x: self.x * rhs, y: self.y * rhs, z: self.z * rhs } }
 }
 
 #[cfg(test)]
