@@ -1,5 +1,10 @@
+use std::ptr::NonNull;
+
 use super::{NativeShape, OcctBackend, OcctShape, OCCT_OK};
-use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryEvidence, GeometryKind, GeometryResult, GeometryStatus, ToleranceContext};
+use umlcad_v6_geometry_api::{
+    GeometryBackend, GeometryError, GeometryEvidence, GeometryKind, GeometryResult, GeometryStatus,
+    ToleranceContext,
+};
 use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceBackend};
 
 unsafe extern "C" {
@@ -56,8 +61,7 @@ impl NurbsSurfaceBackend for OcctBackend {
             return Err(Self::status(status, "OCCT NURBS surface construction failed"));
         }
 
-        let raw = std::ptr::NonNull::new(raw)
-            .ok_or(GeometryError::Unsupported("OCCT returned null"))?;
+        let raw = NonNull::new(raw).ok_or(GeometryError::Unsupported("OCCT returned null"))?;
         Ok(GeometryResult {
             shape: OcctShape::from_raw(raw, GeometryKind::Surface),
             kind: GeometryKind::Surface,
@@ -117,8 +121,14 @@ mod tests {
         definition.weights[3] = 2.0;
         let first = backend.nurbs_surface3d(&definition, TOLERANCE).unwrap().shape;
         let second = backend.nurbs_surface3d(&definition, TOLERANCE).unwrap().shape;
-        assert_eq!(backend.bounding_box(&first, TOLERANCE).unwrap(), backend.bounding_box(&second, TOLERANCE).unwrap());
-        assert_eq!(backend.topology_counts(&first, TOLERANCE).unwrap(), backend.topology_counts(&second, TOLERANCE).unwrap());
+        assert_eq!(
+            backend.bounding_box(&first, TOLERANCE).unwrap(),
+            backend.bounding_box(&second, TOLERANCE).unwrap()
+        );
+        assert_eq!(
+            backend.topology_counts(&first, TOLERANCE).unwrap(),
+            backend.topology_counts(&second, TOLERANCE).unwrap()
+        );
     }
 
     #[test]
@@ -126,9 +136,10 @@ mod tests {
         let backend = OcctBackend::new();
         let mut definition = bilinear();
         definition.weights[0] = 0.0;
-        assert_eq!(
-            backend.nurbs_surface3d(&definition, TOLERANCE),
+        let result = backend.nurbs_surface3d(&definition, TOLERANCE);
+        assert!(matches!(
+            result,
             Err(GeometryError::InvalidInput("invalid NURBS surface definition"))
-        );
+        ));
     }
 }
