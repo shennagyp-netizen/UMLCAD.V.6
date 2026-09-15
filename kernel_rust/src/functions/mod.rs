@@ -1,4 +1,5 @@
 pub mod bezier;
+pub mod bspline;
 pub mod constraints;
 pub mod curves3d;
 pub mod diagnostics;
@@ -6,6 +7,8 @@ pub mod dimensions;
 pub mod dxf;
 pub mod engineering;
 pub mod geometry;
+pub mod nurbs;
+pub mod nurbs_surface;
 pub mod offsets;
 pub mod relations;
 pub mod snapshot;
