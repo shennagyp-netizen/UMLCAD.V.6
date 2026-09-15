@@ -17,24 +17,15 @@ impl Point2 {
     }
 
     fn scale(self, factor: f64) -> Self {
-        Self {
-            x: self.x * factor,
-            y: self.y * factor,
-        }
+        Self { x: self.x * factor, y: self.y * factor }
     }
 
     fn add(self, other: Self) -> Self {
-        Self {
-            x: self.x + other.x,
-            y: self.y + other.y,
-        }
+        Self { x: self.x + other.x, y: self.y + other.y }
     }
 
     fn sub(self, other: Self) -> Self {
-        Self {
-            x: self.x - other.x,
-            y: self.y - other.y,
-        }
+        Self { x: self.x - other.x, y: self.y - other.y }
     }
 
     fn norm(self) -> f64 {
@@ -231,7 +222,7 @@ impl CubicBezier {
 }
 
 fn push_parameter(values: &mut Vec<f64>, value: f64) {
-    if !value.is_finite() || value < -PARAM_EPSILON || value > 1.0 + PARAM_EPSILON {
+    if !value.is_finite() || !(-PARAM_EPSILON..=1.0 + PARAM_EPSILON).contains(&value) {
         return;
     }
     let clamped = value.clamp(0.0, 1.0);
