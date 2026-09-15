@@ -80,16 +80,21 @@ fn coincident_boxes_have_explicit_boolean_semantics() {
     let backend = OcctBackend::new();
     let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
     let right = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
-
     let fused = backend.fuse(&left, &right, TOLERANCE).unwrap().shape;
     assert_eq!(backend.topology_counts(&fused, TOLERANCE).unwrap().solids, 1);
     assert!(backend.validate(&fused, TOLERANCE).unwrap().valid);
-
     let common = backend.common(&left, &right, TOLERANCE).unwrap().shape;
     assert_eq!(backend.topology_counts(&common, TOLERANCE).unwrap().solids, 1);
     assert!(backend.validate(&common, TOLERANCE).unwrap().valid);
-
     assert!(matches!(backend.cut(&left, &right, TOLERANCE), Err(GeometryError::Unsupported(_))));
+}
+
+#[test]
+fn near_degenerate_overlap_is_not_accepted_as_confident_common_geometry() {
+    let backend = OcctBackend::new();
+    let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+    let right = shifted_box(&backend, 10.0 - 5e-10);
+    assert!(matches!(backend.common(&left, &right, TOLERANCE), Err(GeometryError::Unsupported(_))));
 }
 
 #[test]
