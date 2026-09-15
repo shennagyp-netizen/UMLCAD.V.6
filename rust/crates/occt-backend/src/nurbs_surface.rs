@@ -79,7 +79,7 @@ impl NurbsSurfaceBackend for OcctBackend {
 mod tests {
     use super::*;
     use umlcad_v6_geometry_api::GeometryBackend;
-    use umlcad_v6_nurbs_surface_api::Point3;
+    use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, Point3};
 
     const TOLERANCE: ToleranceContext = ToleranceContext {
         modeling: 1e-9,
@@ -88,8 +88,7 @@ mod tests {
 
     fn bilinear() -> NurbsSurface3DDefinition {
         NurbsSurface3DDefinition::new(
-            1,
-            1,
+            (1, 1),
             vec![
                 Point3 { x: 0.0, y: 0.0, z: 0.0 },
                 Point3 { x: 0.0, y: 1.0, z: 1.0 },
@@ -97,8 +96,7 @@ mod tests {
                 Point3 { x: 1.0, y: 1.0, z: 2.0 },
             ],
             vec![1.0; 4],
-            2,
-            2,
+            (2, 2),
             vec![0.0, 0.0, 1.0, 1.0],
             vec![0.0, 0.0, 1.0, 1.0],
         )
