@@ -92,14 +92,19 @@ Required work:
 
 Current S12 implementation checkpoint:
 
-- line-segment / NURBS-surface intersection has a backend-neutral contract, deterministic multi-seed Newton oracle, OCCT `GeomAPI_IntCS` realization, segment-domain filtering, and native-point conformance;
-- planar affine 2x2 NURBS surface / surface intersection has an independent exact plane-plane oracle, bounded UV-domain clipping, explicit parallel/coincident failure, OCCT `GeomAPI_IntSS` realization, and native intersection-endpoint conformance;
-- planar affine 2x2 NURBS point / surface closest-point and distance semantics now have an independent bounded-parallelogram oracle and OCCT `GeomAPI_ProjectPointOnSurf` conformance;
+- line-segment / NURBS-surface intersection has a backend-neutral contract, deterministic multi-seed Newton authority, exact affine-planar classification, OCCT `GeomAPI_IntCS` realization, segment-domain filtering, and native-point conformance;
+- exact affine-planar line/surface classification distinguishes transverse intersection, parallel-disjoint `NoIntersection`, and coplanar `CoincidentOrUnderdetermined` relations before generic Newton;
+- generalized NURBS-curve / NURBS-surface semantics use an independent rational curve evaluator, explicit curve/surface parameter domains, deterministic three-variable Newton isolation, local per-seed failure handling, deterministic root ordering, and ambiguity reporting;
+- isolated NURBS curve/surface tangency is conservatively classified from an independent curve-derivative/surface-normal test, with numerically co-located tangent roots clustered rather than misreported as several distinct intersections;
+- exact degree-1, two-control-point, unit-weight NURBS curves reuse the established planar line/surface semantic authority, including explicit coplanar/underdetermined handling and mapping back to the curve's actual parameter domain;
+- planar affine 2x2 NURBS surface/surface intersection has an independent exact plane-plane oracle, bounded UV-domain clipping, explicit distinction between parallel-disjoint and coincident/underdetermined cases, OCCT `GeomAPI_IntSS` realization, and native intersection-endpoint conformance;
+- planar affine 2x2 NURBS point/surface closest-point and distance semantics have an independent bounded-parallelogram oracle and OCCT `GeomAPI_ProjectPointOnSurf` conformance;
 - arbitrary NURBS parameter intervals are handled explicitly by normalized semantic coordinates rather than assuming `[0,1]` domains;
 - native OCCT remains opaque to the semantic crates;
-- the current surface/surface semantic implementation is intentionally restricted to exact affine planar patches and is not yet a general NURBS surface/surface root solver;
-- line/surface tangent and coincident/underdetermined classification still requires a stronger semantic treatment before the station can close;
-- intersection-driven curve splitting / generalized surface trimming remains outstanding.
+- the semantic/root solvers remain the authority: native OCCT results are checked against independently computed expectations rather than defining semantics from the backend;
+- the current surface/surface semantic implementation is intentionally restricted to exact affine planar patches and is not yet a general NURBS surface/surface root solver or intersection-curve generator;
+- generalized surface trimming from computed intersections remains outstanding, as does full topology evidence for generated intersection boundaries;
+- authoritative CI remains green after the current S12 classification refinements.
 
 **S12 exit condition:** representative curve-surface and surface-surface operations are independently defined, numerically validated, natively realized, deterministic, and proven not to silently convert ambiguous geometric relations into arbitrary topology.
 
