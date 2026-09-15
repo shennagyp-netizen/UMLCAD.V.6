@@ -1,6 +1,5 @@
 #include "bridge.hpp"
 
-#include <IFSelect_ReturnStatus.hxx>
 #include <IGESControl_Controller.hxx>
 #include <IGESControl_Reader.hxx>
 #include <IGESControl_Writer.hxx>
