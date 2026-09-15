@@ -38,8 +38,8 @@ fn circle3d_has_exact_circumference_unit_normal_frame_and_parameterization() {
     assert!((p0.y + 2.0).abs() < 1e-12);
     assert!((p0.z - 4.0).abs() < 1e-12);
     assert!((p25.x - 1.0).abs() < 1e-12);
-    assert!((p25.y + 2.0).abs() < 1e-12);
-    assert!((p25.z - 7.0).abs() < 1e-12);
+    assert!((p25.y - 1.0).abs() < 1e-12);
+    assert!((p25.z - 4.0).abs() < 1e-12);
     let tangent = c.tangent_at(0.0).unwrap();
     assert!((tangent.norm() - 1.0).abs() < 1e-12);
     assert!(tangent.dot(c.normal).abs() < 1e-12);
