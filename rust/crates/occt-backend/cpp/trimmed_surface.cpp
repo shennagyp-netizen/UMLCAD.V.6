@@ -3,6 +3,7 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepLib.hxx>
 #include <Geom2d_Line.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <TColStd_Array1OfInteger.hxx>
@@ -127,7 +128,10 @@ TopoDS_Wire buildWire(const double* uv, uint32_t point_count, const Handle(Geom_
         wire_builder.Add(edge_builder.Edge());
         if (!wire_builder.IsDone()) return TopoDS_Wire();
     }
-    return wire_builder.Wire();
+    TopoDS_Wire wire = wire_builder.Wire();
+    if (wire.IsNull()) return TopoDS_Wire();
+    if (BRepLib::BuildCurves3d(wire) != 0) return TopoDS_Wire();
+    return wire;
 }
 
 }
