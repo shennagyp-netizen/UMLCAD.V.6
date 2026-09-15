@@ -61,14 +61,19 @@ pub fn intersect_nurbs_curve_surface(curve: &NurbsCurve3DDefinition, surface: &N
     for it in 0..seeds { for iu in 0..seeds { for iv in 0..seeds {
         let mut t=t0+(t1-t0)*(it as f64+0.5)/seeds as f64; let mut u=u0+(u1-u0)*(iu as f64+0.5)/seeds as f64; let mut v=v0+(v1-v0)*(iv as f64+0.5)/seeds as f64; let mut converged=false;
         for _ in 0..50 {
-            let (cp,cdt)=evaluate_curve(curve,t)?; let sd=surface.differential_at(u,v).map_err(|e| match e { NurbsSurfaceEvaluationError::InsufficientContinuity=>CurveSurfaceIntersectionError::TangentialContact,_=>CurveSurfaceIntersectionError::NumericalFailure })?;
+            let (cp,cdt) = match evaluate_curve(curve,t) { Ok(x) => x, Err(_) => break };
+            let sd = match surface.differential_at(u,v) {
+                Ok(x) => x,
+                Err(NurbsSurfaceEvaluationError::InsufficientContinuity) => break,
+                Err(_) => break,
+            };
             let r=Point3{x:cp.x-sd.point.x,y:cp.y-sd.point.y,z:cp.z-sd.point.z}; if r.norm()<=residual { converged=true; break; }
             let Some(d)=solve3([[cdt.x,-sd.du.x,-sd.dv.x],[cdt.y,-sd.du.y,-sd.dv.y],[cdt.z,-sd.du.z,-sd.dv.z]],Point3{x:-r.x,y:-r.y,z:-r.z}) else { break; };
             t+=d[0]; u+=d[1]; v+=d[2]; if !t.is_finite()||!u.is_finite()||!v.is_finite() { break; }
             if t<t0-residual||t>t1+residual||u<u0-residual||u>u1+residual||v<v0-residual||v>v1+residual { break; }
         }
         if converged&&t>=t0-residual&&t<=t1+residual&&u>=u0-residual&&u<=u1+residual&&v>=v0-residual&&v<=v1+residual {
-            let t=t.clamp(t0,t1); let u=u.clamp(u0,u1); let v=v.clamp(v0,v1); let (cp,_)=evaluate_curve(curve,t)?; let sp=surface.differential_at(u,v).map_err(|_|CurveSurfaceIntersectionError::NumericalFailure)?.point; let point=Point3{x:0.5*(cp.x+sp.x),y:0.5*(cp.y+sp.y),z:0.5*(cp.z+sp.z)};
+            let t=t.clamp(t0,t1); let u=u.clamp(u0,u1); let v=v.clamp(v0,v1); let (cp,_)=match evaluate_curve(curve,t) { Ok(x)=>x, Err(_)=>continue }; let sp=match surface.differential_at(u,v) { Ok(x)=>x.point, Err(_)=>continue }; let point=Point3{x:0.5*(cp.x+sp.x),y:0.5*(cp.y+sp.y),z:0.5*(cp.z+sp.z)};
             if roots.iter().all(|q:&CurveSurfaceIntersectionPoint| distance(q.point,CurvePoint3{x:point.x,y:point.y,z:point.z})>residual*10.0) { roots.push(CurveSurfaceIntersectionPoint{curve_parameter:t,u,v,point}); }
         }
     }}}
