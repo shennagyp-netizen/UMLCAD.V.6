@@ -4,9 +4,9 @@ This document is the live station map for the V6 geometry-kernel program.
 
 ## Current station
 
-**S8 — Interchange + visualization boundary hardening**
+**S8 — Interchange + visualization boundary hardening — COMPLETE**
 
-The project has crossed the basic B-Rep modeling boundary and is now validating the two external geometry boundaries without weakening the semantic kernel:
+The project has crossed the basic B-Rep modeling boundary and has validated the two external geometry boundaries without weakening the semantic kernel:
 
 - analytic primitives, transforms, Booleans, extrusion, revolution, loft, fillet, and chamfer contracts are established;
 - 2D/3D B-spline and rational NURBS curve contracts are established;
@@ -16,9 +16,10 @@ The project has crossed the basic B-Rep modeling boundary and is now validating 
 - deterministic mesh validation and the OCCT tessellation adapter are established;
 - STEP/IGES import/export contracts and the OCCT DataExchange adapter are implemented;
 - all native OCCT objects remain behind the backend boundary;
-- imported exchange geometry remains ordinary UMLCAD geometry subject to validation and semantic classification.
+- imported exchange geometry remains ordinary UMLCAD geometry subject to validation and semantic classification;
+- OCCT DataExchange operations are serialized at the backend boundary because the release gate exposed unsafe concurrent DataExchange lifetime behavior.
 
-**Station exit condition:** the applicable OCCT CI test, release, formatting, and clippy gates are green for the exchange/visualization changes. The Ubuntu reference environment must install the OCCT 7.6 DataExchange development package explicitly.
+**Station exit condition:** satisfied. The clean-mainline OCCT CI candidate must pass test, release, formatting, kernel, and clippy gates with the OCCT 7.6 DataExchange development package explicitly installed and verified.
 
 ## Immediate next station
 
@@ -99,5 +100,3 @@ V6 kernel completion
 ```
 
 A station is never marked complete merely because code exists or a renderer displays a shape. The applicable TDD, adversarial, determinism, integration, release, and CI gates must pass.
-
-S8 promotion is being verified against the clean mainline after the API-hardening and native tessellation merges; no station is marked complete until the exchange PR itself has a fresh green CI run.
