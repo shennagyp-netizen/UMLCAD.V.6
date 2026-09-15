@@ -61,7 +61,13 @@ impl NurbsSurface3DDefinition {
         require_second_order_continuity(u, self.degree_u, &self.knots_u, self.count_u)?; require_second_order_continuity(v, self.degree_v, &self.knots_v, self.count_v)?;
         let bu = basis_derivatives(u, self.degree_u, &self.knots_u, self.count_u); let bv = basis_derivatives(v, self.degree_v, &self.knots_v, self.count_v);
         let mut h = [[Homogeneous::zero(); 3]; 3];
-        for i in 0..self.count_u { for j in 0..self.count_v { let idx = i * self.count_v + j; let p = self.control_points[idx]; let w = self.weights[idx]; let q = Homogeneous { xw: p.x*w, yw: p.y*w, zw: p.z*w, w }; for ku in 0..=2 { for kv in 0..=2 { h[ku][kv] = h[ku][kv].add(q.scale(bu[i][ku]*bv[j][kv])); } } } }
+        for (i, bu_i) in bu.iter().enumerate().take(self.count_u) {
+            for (j, bv_j) in bv.iter().enumerate().take(self.count_v) {
+                let idx = i * self.count_v + j; let p = self.control_points[idx]; let w = self.weights[idx];
+                let q = Homogeneous { xw: p.x*w, yw: p.y*w, zw: p.z*w, w };
+                for (ku, h_ku) in h.iter_mut().enumerate() { for (kv, h_kuv) in h_ku.iter_mut().enumerate() { *h_kuv = h_kuv.add(q.scale(bu_i[ku]*bv_j[kv])); } }
+            }
+        }
         rationalize_differential(h)
     }
 }
