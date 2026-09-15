@@ -82,7 +82,12 @@ fn line_circle(l: Line, c: Circle) -> f64 {
     if !line_circle_intersections(l, c).is_empty() {
         return 0.0;
     }
-    (c.center.distance(closest(l, c.center)) - c.radius).abs()
+    let endpoint_best = [l.start, l.end]
+        .into_iter()
+        .map(|p| (c.center.distance(p) - c.radius).abs())
+        .fold(f64::INFINITY, f64::min);
+    let nearest_to_center = (c.center.distance(closest(l, c.center)) - c.radius).abs();
+    endpoint_best.min(nearest_to_center)
 }
 
 fn point_on_arc(a: Arc, p: Point) -> bool {
