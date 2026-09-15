@@ -6,5 +6,6 @@ members = [
     "crates/freeform-api",
     "crates/nurbs-surface-api",
     "crates/mesh-api",
+    "crates/exchange-api",
     "crates/occt-backend",
 ]

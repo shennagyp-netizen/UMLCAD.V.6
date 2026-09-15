@@ -35,6 +35,8 @@ int32_t umlcad_occt_shape_vertex_descriptor_count(const umlcad_occt_shape* input
 int32_t umlcad_occt_shape_vertex_descriptors(const umlcad_occt_shape* input,double* out_values,uint32_t capacity);
 int32_t umlcad_occt_shape_validate(const umlcad_occt_shape* input,int32_t* valid,int32_t* manifold);
 int32_t umlcad_occt_shape_tessellation(const umlcad_occt_shape* input,double linear_deflection,double angular_deflection_radians,double* out_vertices_xyz,uint32_t vertex_capacity,uint32_t* out_vertex_count,uint32_t* out_triangles_abc,uint32_t triangle_capacity,uint32_t* out_triangle_count);
+int32_t umlcad_occt_shape_export_file(const umlcad_occt_shape* input,int32_t format,const char* path);
+int32_t umlcad_occt_shape_import_file(int32_t format,const char* path,umlcad_occt_shape** out_shape);
 void umlcad_occt_shape_delete(umlcad_occt_shape* shape);
 #ifdef __cplusplus
 }
