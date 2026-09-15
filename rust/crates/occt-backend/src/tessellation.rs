@@ -1,5 +1,5 @@
 use super::{NativeShape, OcctBackend, OCCT_CONSTRUCTION_FAILED, OCCT_INTERNAL_ERROR, OCCT_INVALID_ARGUMENT, OCCT_NULL_SHAPE, OCCT_OK, OCCT_TRANSFORM_FAILED};
-use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, ToleranceContext};
+use umlcad_v6_geometry_api::GeometryError;
 use umlcad_v6_mesh_api::{Mesh, TessellationBackend, TessellationOptions, Triangle, Vertex};
 
 unsafe extern "C" {
@@ -99,6 +99,7 @@ impl TessellationBackend for OcctBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use umlcad_v6_geometry_api::{GeometryBackend, ToleranceContext};
 
     const OPTIONS: TessellationOptions = TessellationOptions {
         linear_deflection: 0.1,
