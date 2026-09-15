@@ -287,7 +287,7 @@ mod tests {
 
     #[test]
     fn native_line_surface_matches_semantic_point() {
-        let backend = OcctBackend::new_for_tests();
+        let backend = OcctBackend::new();
         let line = LineSegment3D {
             start: umlcad_v6_nurbs_surface_api::Point3 { x: 0.25, y: 0.75, z: -1.0 },
             end: umlcad_v6_nurbs_surface_api::Point3 { x: 0.25, y: 0.75, z: 1.0 },
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn native_nurbs_curve_surface_matches_semantic_point() {
-        let backend = OcctBackend::new_for_tests();
+        let backend = OcctBackend::new();
         let result = backend.intersect_nurbs_curve_surface(&curve(), &plane(), 1e-10).unwrap();
         assert_eq!(result.status, IntersectionStatus::Unique);
         assert_eq!(result.points.len(), 1);
