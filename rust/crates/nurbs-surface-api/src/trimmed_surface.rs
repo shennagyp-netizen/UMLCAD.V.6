@@ -278,14 +278,20 @@ mod tests {
 
     #[test]
     fn hole_outside_outer_loop_is_rejected() {
+        let small_outer = TrimLoop2D::new(vec![
+            ParameterPoint2 { u: 0.1, v: 0.1 },
+            ParameterPoint2 { u: 0.8, v: 0.1 },
+            ParameterPoint2 { u: 0.8, v: 0.8 },
+            ParameterPoint2 { u: 0.1, v: 0.8 },
+        ]);
         let hole = TrimLoop2D::new(vec![
-            ParameterPoint2 { u: 0.9, v: 0.1 },
-            ParameterPoint2 { u: 0.9, v: 0.2 },
-            ParameterPoint2 { u: 1.0, v: 0.2 },
-            ParameterPoint2 { u: 1.0, v: 0.1 },
+            ParameterPoint2 { u: 0.85, v: 0.2 },
+            ParameterPoint2 { u: 0.85, v: 0.3 },
+            ParameterPoint2 { u: 0.95, v: 0.3 },
+            ParameterPoint2 { u: 0.95, v: 0.2 },
         ]);
         assert_eq!(
-            TrimmedNurbsSurface3DDefinition::new(plane(), vec![outer(), hole]).validate(),
+            TrimmedNurbsSurface3DDefinition::new(plane(), vec![small_outer, hole]).validate(),
             Err(TrimmedSurfaceDefinitionError::HoleOutsideOuter)
         );
     }
