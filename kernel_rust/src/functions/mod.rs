@@ -8,5 +8,6 @@ pub mod relations;
 pub mod snapshot;
 pub mod solver;
 pub mod spatial;
+pub mod surfaces;
 pub mod topology;
 pub mod validation;
