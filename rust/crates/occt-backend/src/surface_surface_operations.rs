@@ -80,7 +80,7 @@ mod tests {
         NurbsSurface3DDefinition::new((1,1),vec![Point3{x:0.,y:0.,z:0.},Point3{x:0.,y:1.,z:0.},Point3{x:1.,y:0.,z:0.},Point3{x:1.,y:1.,z:0.}],vec![1.;4],(2,2),vec![0.,0.,1.,1.],vec![0.,0.,1.,1.])
     }
     fn vertical() -> NurbsSurface3DDefinition {
-        NurbsSurface3DDefinition::new((1,1),vec![Point3{x:.5,y:0.,z:-1.},Point3{x:.5,y:0.,z:1.},Point3{x:.5,y:1.,z:-1.},Point3{x:.5,y:1.,z:1.}],vec![1.;4],(2,2),vec![0.,0.,1.,1.],vec![0.,0.,1.,1.])
+        NurbsSurface3DDefinition::new((1,1),vec![Point3{x:0.5,y:0.,z:-1.},Point3{x:0.5,y:0.,z:1.},Point3{x:0.5,y:1.,z:-1.},Point3{x:0.5,y:1.,z:1.}],vec![1.;4],(2,2),vec![0.,0.,1.,1.],vec![0.,0.,1.,1.])
     }
     #[test]
     fn native_segment_geometry_conforms() {
