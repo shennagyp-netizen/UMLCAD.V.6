@@ -51,6 +51,20 @@ impl PlanarSurface {
         if self.width <= 0.0 || self.depth <= 0.0 {
             return Err(SurfaceError::InvalidExtent);
         }
+        if !self.area().is_finite() {
+            return Err(SurfaceError::NonFinite);
+        }
+        let half_width = self.width * 0.5;
+        let half_depth = self.depth * 0.5;
+        let bounds = [
+            self.center.x - half_width,
+            self.center.x + half_width,
+            self.center.y - half_depth,
+            self.center.y + half_depth,
+        ];
+        if bounds.iter().any(|value| !value.is_finite()) {
+            return Err(SurfaceError::NonFinite);
+        }
         Ok(())
     }
 
@@ -129,14 +143,15 @@ impl PlanarSurface {
         if !dx.is_finite() || !dy.is_finite() || !dz.is_finite() {
             return Err(SurfaceError::NonFinite);
         }
-        Ok(Self {
-            center: Point3 {
-                x: self.center.x + dx,
-                y: self.center.y + dy,
-                z: self.center.z + dz,
-            },
-            ..*self
-        })
+        let center = Point3 {
+            x: self.center.x + dx,
+            y: self.center.y + dy,
+            z: self.center.z + dz,
+        };
+        if !center.x.is_finite() || !center.y.is_finite() || !center.z.is_finite() {
+            return Err(SurfaceError::NonFinite);
+        }
+        Ok(Self { center, ..*self })
     }
 }
 
