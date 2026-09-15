@@ -10,6 +10,7 @@ int32_t umlcad_occt_cylinder(double radius,double height,umlcad_occt_shape** out
 int32_t umlcad_occt_sphere(double radius,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_cone(double base_radius,double top_radius,double height,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_torus(double major_radius,double minor_radius,umlcad_occt_shape** out_shape);
+int32_t umlcad_occt_circle_curve(double radius,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_extrude_polygon(const double* points_xy,uint32_t point_count,double height,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_revolve_polygon(const double* profile_rz,uint32_t point_count,double angle_radians,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_loft_polygons(const double* lower_xy,uint32_t lower_count,double lower_z,const double* upper_xy,uint32_t upper_count,double upper_z,umlcad_occt_shape** out_shape);
