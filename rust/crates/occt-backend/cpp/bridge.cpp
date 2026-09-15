@@ -98,17 +98,14 @@ bool edgeDescriptor(const TopoDS_Shape& shape, const TopoDS_Shape& edge, double*
     if (!isFiniteValue(length) || length < 0.0) return false;
     double min_x, min_y, min_z, max_x, max_y, max_z;
     if (!exactBounds(edge, min_x, min_y, min_z, max_x, max_y, max_z)) return false;
-
     uint32_t vertex_use_count = 0;
     for (TopExp_Explorer vertex_explorer(edge, TopAbs_VERTEX); vertex_explorer.More(); vertex_explorer.Next()) ++vertex_use_count;
     if (vertex_use_count == 0) return false;
-
     TopTools_IndexedDataMapOfShapeListOfShape edge_to_faces;
     TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_to_faces);
     const int index = edge_to_faces.FindIndex(edge);
     const uint32_t face_use_count = index == 0 ? 0U : static_cast<uint32_t>(edge_to_faces.FindFromIndex(index).Extent());
     if (face_use_count == 0) return false;
-
     values[0] = length;
     values[1] = min_x; values[2] = min_y; values[3] = min_z;
     values[4] = max_x; values[5] = max_y; values[6] = max_z;
@@ -117,6 +114,23 @@ bool edgeDescriptor(const TopoDS_Shape& shape, const TopoDS_Shape& edge, double*
     return true;
 }
 
+}
+
+extern "C" int32_t umlcad_occt_shape_curve_length(const umlcad_occt_shape* input, double* out_length) {
+    if (input == nullptr || out_length == nullptr) return UMLCAD_OCCT_INVALID_ARGUMENT;
+    *out_length = 0.0;
+    try {
+        if (input->value.IsNull()) return UMLCAD_OCCT_NULL_SHAPE;
+        if (input->value.ShapeType() != TopAbs_EDGE) return UMLCAD_OCCT_INVALID_ARGUMENT;
+        GProp_GProps properties;
+        BRepGProp::LinearProperties(input->value, properties);
+        const double length = properties.Mass();
+        if (!isFiniteValue(length) || length <= 0.0) return UMLCAD_OCCT_CONSTRUCTION_FAILED;
+        *out_length = length;
+        return UMLCAD_OCCT_OK;
+    } catch (...) {
+        return UMLCAD_OCCT_INTERNAL_ERROR;
+    }
 }
 
 extern "C" int32_t umlcad_occt_box(double width,double depth,double height,umlcad_occt_shape** out_shape){
