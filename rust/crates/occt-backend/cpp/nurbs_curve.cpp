@@ -81,13 +81,12 @@ extern "C" int32_t umlcad_occt_nurbs_curve3d(
             occt_multiplicities.SetValue(static_cast<Standard_Integer>(i + 1), multiplicities[i]);
         }
 
-        const Standard_Boolean rational = Standard_True;
         const Handle(Geom_BSplineCurve) curve = new Geom_BSplineCurve(
             poles, pole_weights, occt_knots, occt_multiplicities,
             static_cast<Standard_Integer>(degree), Standard_False, Standard_True);
         if (curve.IsNull()) return UMLCAD_OCCT_CONSTRUCTION_FAILED;
 
-        const BRepBuilderAPI_MakeEdge maker(curve);
+        BRepBuilderAPI_MakeEdge maker(curve);
         if (!maker.IsDone()) return UMLCAD_OCCT_CONSTRUCTION_FAILED;
         const TopoDS_Edge edge = maker.Edge();
         if (edge.IsNull()) return UMLCAD_OCCT_CONSTRUCTION_FAILED;
@@ -95,7 +94,6 @@ extern "C" int32_t umlcad_occt_nurbs_curve3d(
         auto* result = new (std::nothrow) umlcad_occt_shape{edge};
         if (result == nullptr) return UMLCAD_OCCT_INTERNAL_ERROR;
         *out_shape = result;
-        (void)rational;
         return UMLCAD_OCCT_OK;
     } catch (...) {
         return UMLCAD_OCCT_INTERNAL_ERROR;
