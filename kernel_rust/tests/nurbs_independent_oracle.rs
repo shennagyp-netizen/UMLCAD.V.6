@@ -44,7 +44,7 @@ fn rational_nurbs_matches_independent_cox_de_boor_oracle() {
             Point3 { x: 10.0, y: 0.0, z: 5.0 },
         ],
         vec![1.0, 0.7, 1.8, 0.9, 1.2],
-        vec![0.0, 0.0, 0.0, 0.0, 0.4, 0.8, 1.0, 1.0, 1.0, 1.0],
+        vec![0.0, 0.0, 0.0, 0.0, 0.4, 0.8, 1.0, 1.0, 1.0],
     );
     for u in [0.0, 0.05, 0.17, 0.31, 0.49, 0.63, 0.79, 0.93, 1.0] {
         assert_point_close(curve.point_at(u).unwrap(), independent_rational_point(&curve, u), 1e-12);
