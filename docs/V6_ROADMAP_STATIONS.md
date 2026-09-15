@@ -99,3 +99,5 @@ V6 kernel completion
 ```
 
 A station is never marked complete merely because code exists or a renderer displays a shape. The applicable TDD, adversarial, determinism, integration, release, and CI gates must pass.
+
+S8 promotion is being verified against the clean mainline after the API-hardening and native tessellation merges; no station is marked complete until the exchange PR itself has a fresh green CI run.
