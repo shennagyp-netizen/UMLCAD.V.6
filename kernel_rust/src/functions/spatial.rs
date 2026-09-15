@@ -86,6 +86,20 @@ fn point_on_arc(a: Arc, p: Point) -> bool {
     a.contains_point(p)
 }
 
+fn arc_point_distance(a: Arc, p: Point) -> f64 {
+    let radial = p.sub(a.center);
+    let radial_length = radial.norm();
+    if radial_length > EPSILON {
+        let projected = a.center.add(radial.scale(a.radius / radial_length));
+        if point_on_arc(a, projected) {
+            return (radial_length - a.radius).abs();
+        }
+    }
+    a.start_point()
+        .distance(p)
+        .min(a.end_point().distance(p))
+}
+
 fn push_unique(points: &mut Vec<Point>, p: Point) {
     if !points
         .iter()
@@ -181,7 +195,7 @@ fn line_arc(l: Line, a: Arc) -> f64 {
     }
     let mut best = f64::INFINITY;
     for p in [l.start, l.end] {
-        best = best.min(a.distance_to_point(p));
+        best = best.min(arc_point_distance(a, p));
     }
     for p in [a.start_point(), a.end_point()] {
         best = best.min(l.start.distance(p).min(l.end.distance(p)));
@@ -246,16 +260,16 @@ fn arc_arc(a: Arc, b: Arc) -> f64 {
     }
     let mut best = f64::INFINITY;
     for p in [a.start_point(), a.end_point()] {
-        best = best.min(b.distance_to_point(p));
+        best = best.min(arc_point_distance(b, p));
     }
     for p in [b.start_point(), b.end_point()] {
-        best = best.min(a.distance_to_point(p));
+        best = best.min(arc_point_distance(a, p));
     }
     for p in arc_extreme_candidates(a, b.center) {
-        best = best.min(b.distance_to_point(p));
+        best = best.min(arc_point_distance(b, p));
     }
     for p in arc_extreme_candidates(b, a.center) {
-        best = best.min(a.distance_to_point(p));
+        best = best.min(arc_point_distance(a, p));
     }
     if a.center.distance(b.center) <= EPSILON && concentric_arc_overlap(a, b) {
         best.min((a.radius - b.radius).abs())
