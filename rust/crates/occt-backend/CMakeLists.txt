@@ -13,6 +13,7 @@ add_library(umlcad_occt_bridge SHARED
     cpp/loft.cpp
     cpp/fillet.cpp
     cpp/vertex.cpp
+    cpp/torus.cpp
 )
 target_include_directories(umlcad_occt_bridge PRIVATE ${OpenCASCADE_INCLUDE_DIR})
 target_link_directories(umlcad_occt_bridge PRIVATE ${OpenCASCADE_LIBRARY_DIR})
