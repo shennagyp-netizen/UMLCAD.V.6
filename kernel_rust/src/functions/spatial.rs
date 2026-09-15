@@ -79,7 +79,10 @@ fn circle_circle(a: Circle, b: Circle) -> f64 {
 }
 
 fn line_circle(l: Line, c: Circle) -> f64 {
-    (c.center.distance(closest(l, c.center)) - c.radius).max(0.0)
+    if !line_circle_intersections(l, c).is_empty() {
+        return 0.0;
+    }
+    (c.center.distance(closest(l, c.center)) - c.radius).abs()
 }
 
 fn point_on_arc(a: Arc, p: Point) -> bool {
