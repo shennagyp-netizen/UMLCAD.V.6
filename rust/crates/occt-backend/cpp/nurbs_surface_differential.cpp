@@ -1,7 +1,6 @@
 #include "bridge.hpp"
 
 #include <BRep_Tool.hxx>
-#include <Geom_BSplineSurface.hxx>
 #include <Geom_Surface.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
@@ -11,6 +10,8 @@
 
 #include <cmath>
 #include <cstdint>
+
+struct umlcad_occt_shape { TopoDS_Shape value; };
 
 namespace {
 bool finite(double value) { return std::isfinite(value); }
