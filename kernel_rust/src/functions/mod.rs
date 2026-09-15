@@ -1,3 +1,4 @@
+pub mod bezier;
 pub mod constraints;
 pub mod diagnostics;
 pub mod dimensions;
