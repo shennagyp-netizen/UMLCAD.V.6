@@ -9,6 +9,7 @@ pub mod engineering;
 pub mod geometry;
 pub mod nurbs;
 pub mod nurbs_surface;
+pub mod nurbs_surface_differential;
 pub mod offsets;
 pub mod relations;
 pub mod snapshot;
