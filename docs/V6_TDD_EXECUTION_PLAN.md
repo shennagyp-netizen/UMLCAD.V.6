@@ -202,11 +202,11 @@ Expose a narrow C ABI from the C++ library. The public Rust crate sees opaque ha
 The C ABI now provides deterministic ownership semantics for:
 
 ```text
-create box
+create primitive
 clone shape
-translate shape
-rotate shape
+transform shape
 measure bounding box
+extract topology evidence
 validate shape
 release shape
 ```
@@ -288,7 +288,7 @@ Bounding-box measurement must not silently inherit backend tolerance inflation.
 
 The reference implementation uses `BRepBndLib::AddOptimal` with shape-tolerance enlargement disabled and a zero explicit `Bnd_Box` gap. A test failure caused by OCCT's default bounding-box tolerance expansion was treated as an implementation defect and fixed rather than by widening the UMLCAD measurement tolerance.
 
-Tests must continue to verify exact analytic primitive bounds within the declared comparison tolerance and must include transformed cases.
+For curved analytic primitives, the declared validation tolerance is the acceptance boundary for bounding-box comparison. In the OCCT 7.6.3 reference environment, an axis-aligned ring torus (major radius 20, minor radius 5) measured with an approximately `1e-7` envelope expansion. This is accepted under `validation=1e-6` and is not substituted into the modeling tolerance.
 
 ### D4. Topology attacks
 
@@ -299,7 +299,9 @@ For the primitive baseline test:
 - solid/manifold status is explicit;
 - validation failures remain failures even when a renderer could display the shape.
 
-The current `hasSolid()` check is only a baseline conformance signal. It is **not** yet sufficient to claim a complete manifold/topology proof for arbitrary B-Rep. Stronger topology evidence is a mandatory next phase.
+Topology evidence now includes explicit geometric descriptors for faces, edges, and vertices. Edge and vertex incidence is counted from unique topological entities rather than raw traversal-use counts. Seam-like analytic topology is not forced into an incorrect two-distinct-neighbor model.
+
+The current validation uses `BRepCheck_Analyzer` plus closed edge-use evidence for solids. This is a stronger signal than the original `hasSolid()` baseline but is still not a complete proof of every possible B-Rep manifold property; advanced shells and imported pathological topology require additional dedicated validators.
 
 ### D5. Resource attacks
 
@@ -347,21 +349,25 @@ write contract tests
 → GREEN
 ```
 
-Immediate operation order after the current primitive/transform baseline:
+Current implemented operation families:
 
-1. transform algebra/invariants;
-2. stronger topology inspection and stable geometric references;
-3. additional primitive solids;
-4. curves and analytic surfaces;
-5. Boolean union/difference/intersection;
-6. extrusions and revolutions;
-7. sweeps/lofts;
-8. fillets/chamfers;
-9. offsets and healing;
-10. NURBS/freeform surfaces;
-11. tessellation for visualization;
-12. STEP/IGES exchange;
-13. advanced assembly-related geometry operations.
+1. primitive solids: box, cylinder, sphere, cone, and non-self-intersecting ring torus;
+2. transform algebra and immutable translation/rotation;
+3. topology evidence and stable geometric face/edge/vertex references;
+4. Boolean union/difference/intersection;
+5. extrusions and revolutions;
+6. polygonal lofts;
+7. fillets/chamfers.
+
+Remaining expansion order:
+
+1. analytic curves and surfaces;
+2. sweeps/pipes;
+3. offsets and healing;
+4. NURBS/freeform surfaces;
+5. tessellation for visualization;
+6. STEP/IGES exchange;
+7. advanced assembly-related geometry operations.
 
 The list is not permission to implement everything at once. Each line is a separate red-green gate.
 
@@ -397,6 +403,24 @@ Requirements:
 - ambiguity must produce an explicit ambiguous/indeterminate result rather than a guessed target.
 
 Topology-reference tests are mandatory before assembly or feature-history work depends on them.
+
+The current reference evidence classes are:
+
+```text
+FaceDescriptor
+EdgeDescriptor
+VertexDescriptor
+```
+
+Each resolver performs evidence matching under the declared validation tolerance and returns:
+
+```text
+Unique
+Ambiguous
+NotFound
+```
+
+Equivalent independent regeneration is covered by regression tests. Topology-changing or translated rebuilds are explicitly prevented from being silently interpreted as the old target.
 
 ## 13. Accuracy and tolerance discipline
 
