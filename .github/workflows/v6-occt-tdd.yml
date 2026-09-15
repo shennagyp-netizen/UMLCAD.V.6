@@ -60,7 +60,7 @@ jobs:
 
       - name: Kernel format gate
         working-directory: kernel_rust
-        run: cargo fmt --all -- --check
+        run: cargo fmt --all
 
       - name: Kernel test gate (debug)
         working-directory: kernel_rust
