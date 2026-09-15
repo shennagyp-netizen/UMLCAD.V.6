@@ -22,7 +22,6 @@ fn bilinear_plane_has_constant_exact_first_derivatives() {
     assert!((du.x - 1.0).abs() < 1e-12);
     assert!(du.y.abs() < 1e-12);
     assert!((du.z - 2.0).abs() < 1e-12);
-
     assert!(dv.x.abs() < 1e-12);
     assert!((dv.y - 1.0).abs() < 1e-12);
     assert!((dv.z - 1.0).abs() < 1e-12);
@@ -32,7 +31,7 @@ fn bilinear_plane_has_constant_exact_first_derivatives() {
 fn planar_normal_is_unit_and_orientation_is_deterministic() {
     let surface = plane();
     let normal = surface.normal_at(0.3, 0.8).unwrap();
-    let expected = p(-1.0, -1.0, 1.0);
+    let expected = p(-2.0, -1.0, 1.0);
     let magnitude = expected.x.hypot(expected.y.hypot(expected.z));
     assert!((normal.x - expected.x / magnitude).abs() < 1e-12);
     assert!((normal.y - expected.y / magnitude).abs() < 1e-12);
