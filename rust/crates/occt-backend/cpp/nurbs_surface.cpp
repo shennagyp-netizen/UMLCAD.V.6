@@ -42,11 +42,12 @@ KnotData distinctKnots(const double* knots, uint32_t count) {
 bool validInput(const double* poles_xyz, uint32_t count_u, uint32_t count_v,
                 const double* weights, const double* knots_u, uint32_t knot_count_u,
                 const double* knots_v, uint32_t knot_count_v,
-                uint32_t degree_u, uint32_t degree_v) {
+                uint32_t degree_u, uint32_t degree_v, double face_tolerance) {
     if (poles_xyz == nullptr || weights == nullptr || knots_u == nullptr || knots_v == nullptr) return false;
     if (degree_u == 0 || degree_v == 0) return false;
     if (count_u < degree_u + 1U || count_v < degree_v + 1U) return false;
     if (knot_count_u != count_u + degree_u + 1U || knot_count_v != count_v + degree_v + 1U) return false;
+    if (!finite(face_tolerance) || face_tolerance < 0.0) return false;
 
     const uint64_t point_count = static_cast<uint64_t>(count_u) * static_cast<uint64_t>(count_v);
     for (uint64_t i = 0; i < point_count * 3U; ++i) if (!finite(poles_xyz[i])) return false;
@@ -80,11 +81,12 @@ extern "C" int32_t umlcad_occt_nurbs_surface3d(
     const double* poles_xyz, uint32_t count_u, uint32_t count_v,
     const double* weights, const double* knots_u, uint32_t knot_count_u,
     const double* knots_v, uint32_t knot_count_v,
-    uint32_t degree_u, uint32_t degree_v, umlcad_occt_shape** out_shape) {
+    uint32_t degree_u, uint32_t degree_v, double face_tolerance,
+    umlcad_occt_shape** out_shape) {
     if (out_shape == nullptr) return UMLCAD_OCCT_INVALID_ARGUMENT;
     *out_shape = nullptr;
     if (!validInput(poles_xyz, count_u, count_v, weights, knots_u, knot_count_u,
-                    knots_v, knot_count_v, degree_u, degree_v)) {
+                    knots_v, knot_count_v, degree_u, degree_v, face_tolerance)) {
         return UMLCAD_OCCT_INVALID_ARGUMENT;
     }
 
@@ -110,7 +112,6 @@ extern "C" int32_t umlcad_occt_nurbs_surface3d(
 
         const KnotData u_data = distinctKnots(knots_u, knot_count_u);
         const KnotData v_data = distinctKnots(knots_v, knot_count_v);
-
         TColStd_Array1OfReal occt_knots_u(1, static_cast<Standard_Integer>(u_data.values.size()));
         TColStd_Array1OfInteger occt_mults_u(1, static_cast<Standard_Integer>(u_data.multiplicities.size()));
         TColStd_Array1OfReal occt_knots_v(1, static_cast<Standard_Integer>(v_data.values.size()));
@@ -137,7 +138,7 @@ extern "C" int32_t umlcad_occt_nurbs_surface3d(
         const Standard_Real u_max = knots_u[count_u];
         const Standard_Real v_min = knots_v[degree_v];
         const Standard_Real v_max = knots_v[count_v];
-        BRepBuilderAPI_MakeFace maker(surface, u_min, u_max, v_min, v_max, 1.0e-9);
+        BRepBuilderAPI_MakeFace maker(surface, u_min, u_max, v_min, v_max, face_tolerance);
         if (!maker.IsDone()) return UMLCAD_OCCT_CONSTRUCTION_FAILED;
         const TopoDS_Face face = maker.Face();
         if (face.IsNull()) return UMLCAD_OCCT_CONSTRUCTION_FAILED;
