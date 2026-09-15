@@ -1,12 +1,16 @@
 # UMLCAD V6 — Roadmap Stations
 
-This document is the live station map for the V6 geometry-kernel program.
+This document is the live station map for the V6 geometry-kernel program. The mathematical/semantic layer is developed ahead of native realization; stations below therefore distinguish semantic authority from backend implementation and conformance.
 
 ## Current station
 
-**S8 — Interchange + visualization boundary hardening — COMPLETE**
+**S10 — NURBS surface differential/backend conformance — NEXT / CURRENT**
 
-The project has crossed the basic B-Rep modeling boundary and has validated the two external geometry boundaries without weakening the semantic kernel:
+S8 and S9 are complete. The semantic NURBS surface mathematics and exact differential contracts already exist; S9 added the OCCT reference realization without making OCCT the mathematical authority.
+
+## Completed stations
+
+### S8 — Interchange + visualization boundary hardening — COMPLETE
 
 - analytic primitives, transforms, Booleans, extrusion, revolution, loft, fillet, and chamfer contracts are established;
 - 2D/3D B-spline and rational NURBS curve contracts are established;
@@ -19,33 +23,43 @@ The project has crossed the basic B-Rep modeling boundary and has validated the 
 - imported exchange geometry remains ordinary UMLCAD geometry subject to validation and semantic classification;
 - OCCT DataExchange operations are serialized at the backend boundary because the release gate exposed unsafe concurrent DataExchange lifetime behavior.
 
-**Station exit condition:** satisfied. The clean-mainline OCCT CI candidate must pass test, release, formatting, kernel, and clippy gates with the OCCT 7.6 DataExchange development package explicitly installed and verified.
+### S9 — Native tensor-product NURBS surface backend — COMPLETE
+
+The already-defined backend-neutral `NurbsSurface3DDefinition` contract is now realized by the OCCT reference backend:
+
+1. semantic definition validation occurs before FFI;
+2. complete U/V knot vectors are converted to OCCT distinct knots plus multiplicities;
+3. `Geom_BSplineSurface` is constructed with the 2D rational weight net;
+4. semantic U/V control-net ordering `u * count_v + v` is preserved;
+5. the native result crosses the boundary only as an opaque UMLCAD backend shape;
+6. bilinear, rational, invalid-definition, and deterministic-construction tests are present;
+7. surface construction remains separate from future trimmed-face topology.
+
+**S9 exit condition:** satisfied by the full authoritative OCCT TDD matrix: workspace debug/release tests, Clippy, kernel debug/release tests, kernel source/test Clippy, and formatting gates all passed on PR #41 before merge to `main`.
 
 ## Immediate next station
 
-**S9 — Native tensor-product NURBS surface backend**
+### S10 — NURBS surface differential/backend conformance
 
-Implement the OCCT reference realization for the already-defined backend-neutral `NurbsSurface3DDefinition` contract:
+The goal is **not** to invent the mathematical layer; it already exists. The goal is to prove that the native surface realization is mathematically faithful to it.
 
-1. validate the semantic definition before FFI;
-2. convert the full U/V knot vectors into OCCT distinct knots plus multiplicities;
-3. construct `Geom_BSplineSurface` with the 2D rational weight net;
-4. preserve the semantic U/V control-net ordering exactly;
-5. expose the result only as an opaque UMLCAD backend shape;
-6. create focused conformance tests for bilinear surfaces, rational surfaces, invalid weights/knots, and deterministic repeated construction;
-7. keep surface construction separate from trimmed-face topology.
+Required work:
 
-**Station exit condition:** exact semantic definition validation, successful OCCT construction, deterministic measurements, and no OCCT type leakage across the Rust/API boundary.
+1. expose or add backend measurements/evaluation needed to compare native NURBS surface points with the semantic evaluator;
+2. compare first and second partial derivatives against the independent mathematical implementation/oracle;
+3. verify normals and cross-product orientation where regular;
+4. explicitly classify singular/degenerate parameter cases rather than returning plausible but invalid values;
+5. test rational and non-rational surfaces, interior knots, non-unit parameter domains, and asymmetric U/V degrees;
+6. preserve tolerance separation: mathematical comparison tolerance must not become hidden modeling tolerance;
+7. establish deterministic conformance evidence suitable for later trimmed B-Rep construction.
+
+**Station exit condition:** native and mathematical results agree within explicitly declared numerical bounds across regular and adversarial cases, with singular cases explicitly diagnosed and no OCCT types exposed through the semantic API.
 
 ## Following stations
 
-### S10 — NURBS surface differential/backend conformance
-
-Connect native NURBS surfaces to analytic first/second differential measurements and independent mathematical oracles. Verify points, partial derivatives, normals, singular/degenerate cases, and tolerance separation.
-
 ### S11 — Freeform face construction and trimming
 
-Promote validated NURBS surfaces into B-Rep faces with explicit trimming wires/edges. Establish orientation, parameter-space versus 3D curve consistency, closure, and manifold validation. No guessed topology identity.
+Promote validated NURBS surfaces into B-Rep faces with explicit trimming wires/edges. Establish orientation, parameter-space versus 3D curve consistency, closure, seam handling, and manifold validation. No guessed topology identity.
 
 ### S12 — Surface-surface / curve-surface operations
 
@@ -77,26 +91,18 @@ V6 kernel completion means the applicable geometry/B-Rep/freeform contracts requ
 
 ## Scope discipline
 
-The station map is intentionally ordered by dependency:
+The station map distinguishes three layers:
 
 ```text
-semantic freeform definition
+mathematical / semantic authority
         ↓
-native freeform realization
+backend-neutral contract
         ↓
-differential geometry
+native realization (OCCT reference backend)
         ↓
-trimmed B-Rep faces
+backend conformance against the mathematics
         ↓
-freeform intersections / offsets / healing
-        ↓
-feature generation
-        ↓
-robust topology
-        ↓
-integration + performance
-        ↓
-V6 kernel completion
+B-Rep topology / advanced freeform operations
 ```
 
-A station is never marked complete merely because code exists or a renderer displays a shape. The applicable TDD, adversarial, determinism, integration, release, and CI gates must pass.
+A backend may implement the mathematics, but it never defines the semantics. A station is never marked complete merely because code exists or a renderer displays a shape. The applicable TDD, adversarial, determinism, integration, release, and CI gates must pass.
