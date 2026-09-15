@@ -1,3 +1,6 @@
+#[path = "trimmed_surface_backend.rs"]
+mod trimmed_surface_backend;
+
 use std::ptr::NonNull;
 
 use crate::{NativeShape, OcctBackend, OcctShape, OCCT_OK};
@@ -5,7 +8,7 @@ use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryEvidence, G
 use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceBackend, NurbsSurfaceDifferential, NurbsSurfaceDifferentialBackend, Point3};
 
 unsafe extern "C" {
-    fn umlcad_occt_nurbs_surface3d(poles_xyz: *const f64, count_u: u32, count_v: u32, weights: *const f64, knots_u: *const f64, knot_count_u: u32, knots_v: *const f64, knot_count_v: u32, degree_u: u32, degree_v: u32, face_tolerance: f64, out_shape: *mut *mut NativeShape) -> i32;
+    fn umlcad_occt_nurbs_surface3d(poles_xyz: *const f64, count_u: u32, count_v: u32, weights: *const f64, knots_u: *const f64, knot_count_u: u32, knots_v: *const f64, knot_count_v: u32, degree_u: u32, degree_v: u32, face_tolerance: f64, out_shape: *mut *mut NativeShape);
     fn umlcad_occt_nurbs_surface3d_differential(shape: *const NativeShape, u: f64, v: f64, out_values: *mut f64) -> i32;
 }
 
