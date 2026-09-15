@@ -29,9 +29,9 @@ fn circular_sweep_parameterization_is_on_the_circular_envelope() {
     let s = CircularSweep::new(point(0.0, 0.0, 0.0), point(0.0, 0.0, 10.0), 2.0);
     let p0 = s.surface_point_at(0.0, 0.0).unwrap();
     let p1 = s.surface_point_at(1.0, PI / 2.0).unwrap();
-    assert!((p0.x * p0.x + p0.y * p0.y).sqrt().abs() - 2.0 < 1e-12);
+    assert!(((p0.x * p0.x + p0.y * p0.y).sqrt() - 2.0).abs() < 1e-12);
     assert!(p0.z.abs() < 1e-12);
-    assert!((p1.x * p1.x + p1.y * p1.y).sqrt() - 2.0 < 1e-12);
+    assert!(((p1.x * p1.x + p1.y * p1.y).sqrt() - 2.0).abs() < 1e-12);
     assert!((p1.z - 10.0).abs() < 1e-12);
 }
 
