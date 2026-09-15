@@ -1,7 +1,160 @@
 use umlcad_kernel_rust::functions::nurbs_surface::{NurbsSurface2D, NurbsSurfaceError, Point3};
-fn p(x:f64,y:f64,z:f64)->Point3{Point3{x,y,z}}
-#[test]fn bilinear_surface_matches_plane_oracle(){let s=NurbsSurface2D::new(1,1,vec![p(0.,0.,0.),p(0.,1.,1.),p(1.,0.,2.),p(1.,1.,3.)],vec![1.;4],vec![0.,0.,1.,1.],vec![0.,0.,1.,1.]);let q=s.point_at(.25,.75).unwrap();assert!((q.x-.25).abs()<1e-12);assert!((q.y-.75).abs()<1e-12);assert!((q.z-1.25).abs()<1e-12);}
-#[test]fn rational_weight_changes_surface_geometry(){let s=NurbsSurface2D::new(1,1,vec![p(0.,0.,0.),p(0.,1.,0.),p(1.,0.,0.),p(1.,1.,1.)],vec![1.,1.,1.,2.],vec![0.,0.,1.,1.],vec![0.,0.,1.,1.]);let q=s.point_at(.5,.5).unwrap();assert!((q.x-.6).abs()<1e-12);assert!((q.y-.6).abs()<1e-12);assert!((q.z-.4).abs()<1e-12);}
-#[test]fn positive_weights_preserve_control_box_property(){let s=NurbsSurface2D::new(2,2,vec![p(0.,0.,-1.),p(0.,1.,2.),p(0.,2.,0.),p(1.,0.,3.),p(1.,1.,5.),p(1.,2.,1.),p(2.,0.,0.),p(2.,1.,4.),p(2.,2.,-2.)],vec![1.;9],vec![0.,0.,0.,1.,1.,1.],vec![0.,0.,0.,1.,1.,1.]);let b=s.control_hull_bounds().unwrap();for(u,v)in[(0.,0.),(.2,.3),(.5,.5),(.8,.7),(1.,1.)]{let q=s.point_at(u,v).unwrap();assert!(q.x>=b.min.x-1e-12&&q.x<=b.max.x+1e-12);assert!(q.y>=b.min.y-1e-12&&q.y<=b.max.y+1e-12);assert!(q.z>=b.min.z-1e-12&&q.z<=b.max.z+1e-12);}}
-#[test]fn translation_is_immutable(){let s=NurbsSurface2D::new(1,1,vec![p(0.,0.,0.),p(0.,1.,1.),p(1.,0.,2.),p(1.,1.,3.)],vec![1.;4],vec![0.,0.,1.,1.],vec![0.,0.,1.,1.]);let m=s.translated(100.,-20.,7.).unwrap();let a=s.point_at(.3,.7).unwrap();let b=m.point_at(.3,.7).unwrap();assert!((b.x-a.x-100.).abs()<1e-12);assert!((b.y-a.y+20.).abs()<1e-12);assert!((b.z-a.z-7.).abs()<1e-12);}
-#[test]fn invalid_inputs_fail_closed(){let pnts=vec![p(0.,0.,0.),p(0.,1.,0.),p(1.,0.,0.),p(1.,1.,0.)];let w=vec![1.;4];let k=vec![0.,0.,1.,1.];assert_eq!(NurbsSurface2D::new(0,1,pnts.clone(),w.clone(),k.clone(),k.clone()).validate(),Err(NurbsSurfaceError::InvalidDegree));assert_eq!(NurbsSurface2D::new(1,1,pnts.clone(),vec![1.,1.],k.clone(),k.clone()).validate(),Err(NurbsSurfaceError::InvalidWeightCount));assert_eq!(NurbsSurface2D::new(1,1,pnts,w,vec![0.,.5,.25,1.],k).validate(),Err(NurbsSurfaceError::KnotsMustBeNondecreasing));}
+
+fn p(x: f64, y: f64, z: f64) -> Point3 {
+    Point3 { x, y, z }
+}
+
+fn assert_point_close(actual: Point3, expected: Point3, tolerance: f64) {
+    assert!((actual.x - expected.x).abs() <= tolerance);
+    assert!((actual.y - expected.y).abs() <= tolerance);
+    assert!((actual.z - expected.z).abs() <= tolerance);
+}
+
+#[test]
+fn bilinear_surface_matches_plane_oracle() {
+    let surface = NurbsSurface2D::new(
+        1,
+        1,
+        vec![
+            p(0.0, 0.0, 0.0),
+            p(0.0, 1.0, 1.0),
+            p(1.0, 0.0, 2.0),
+            p(1.0, 1.0, 3.0),
+        ],
+        vec![1.0; 4],
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![0.0, 0.0, 1.0, 1.0],
+    );
+    let point = surface.point_at(0.25, 0.75).unwrap();
+    assert_point_close(point, p(0.25, 0.75, 1.25), 1e-12);
+}
+
+#[test]
+fn rational_weight_changes_surface_geometry() {
+    let surface = NurbsSurface2D::new(
+        1,
+        1,
+        vec![
+            p(0.0, 0.0, 0.0),
+            p(0.0, 1.0, 0.0),
+            p(1.0, 0.0, 0.0),
+            p(1.0, 1.0, 1.0),
+        ],
+        vec![1.0, 1.0, 1.0, 2.0],
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![0.0, 0.0, 1.0, 1.0],
+    );
+    let point = surface.point_at(0.5, 0.5).unwrap();
+    assert_point_close(point, p(0.6, 0.6, 0.4), 1e-12);
+}
+
+#[test]
+fn positive_weights_preserve_control_box_property() {
+    let surface = NurbsSurface2D::new(
+        2,
+        2,
+        vec![
+            p(0.0, 0.0, -1.0),
+            p(0.0, 1.0, 2.0),
+            p(0.0, 2.0, 0.0),
+            p(1.0, 0.0, 3.0),
+            p(1.0, 1.0, 5.0),
+            p(1.0, 2.0, 1.0),
+            p(2.0, 0.0, 0.0),
+            p(2.0, 1.0, 4.0),
+            p(2.0, 2.0, -2.0),
+        ],
+        vec![1.0; 9],
+        vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+        vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+    );
+    let bounds = surface.control_hull_bounds().unwrap();
+
+    for (u, v) in [
+        (0.0, 0.0),
+        (0.2, 0.3),
+        (0.5, 0.5),
+        (0.8, 0.7),
+        (1.0, 1.0),
+    ] {
+        let point = surface.point_at(u, v).unwrap();
+        assert!(point.x >= bounds.min.x - 1e-12 && point.x <= bounds.max.x + 1e-12);
+        assert!(point.y >= bounds.min.y - 1e-12 && point.y <= bounds.max.y + 1e-12);
+        assert!(point.z >= bounds.min.z - 1e-12 && point.z <= bounds.max.z + 1e-12);
+    }
+}
+
+#[test]
+fn translation_is_immutable() {
+    let surface = NurbsSurface2D::new(
+        1,
+        1,
+        vec![
+            p(0.0, 0.0, 0.0),
+            p(0.0, 1.0, 1.0),
+            p(1.0, 0.0, 2.0),
+            p(1.0, 1.0, 3.0),
+        ],
+        vec![1.0; 4],
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![0.0, 0.0, 1.0, 1.0],
+    );
+    let moved = surface.translated(100.0, -20.0, 7.0).unwrap();
+    let original = surface.point_at(0.3, 0.7).unwrap();
+    let translated = moved.point_at(0.3, 0.7).unwrap();
+    assert_point_close(
+        translated,
+        p(original.x + 100.0, original.y - 20.0, original.z + 7.0),
+        1e-12,
+    );
+    assert_eq!(surface.point_at(0.3, 0.7).unwrap(), original);
+}
+
+#[test]
+fn invalid_inputs_fail_closed() {
+    let points = vec![
+        p(0.0, 0.0, 0.0),
+        p(0.0, 1.0, 0.0),
+        p(1.0, 0.0, 0.0),
+        p(1.0, 1.0, 0.0),
+    ];
+    let weights = vec![1.0; 4];
+    let knots = vec![0.0, 0.0, 1.0, 1.0];
+
+    assert_eq!(
+        NurbsSurface2D::new(
+            0,
+            1,
+            points.clone(),
+            weights.clone(),
+            knots.clone(),
+            knots.clone(),
+        )
+        .validate(),
+        Err(NurbsSurfaceError::InvalidDegree)
+    );
+    assert_eq!(
+        NurbsSurface2D::new(
+            1,
+            1,
+            points.clone(),
+            vec![1.0, 1.0],
+            knots.clone(),
+            knots.clone(),
+        )
+        .validate(),
+        Err(NurbsSurfaceError::InvalidWeightCount)
+    );
+    assert_eq!(
+        NurbsSurface2D::new(
+            1,
+            1,
+            points,
+            weights,
+            vec![0.0, 0.5, 0.25, 1.0],
+            knots,
+        )
+        .validate(),
+        Err(NurbsSurfaceError::KnotsMustBeNondecreasing)
+    );
+}
