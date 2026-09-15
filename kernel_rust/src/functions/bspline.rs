@@ -9,8 +9,16 @@ impl Point2 {
         Self { x: self.x + other.x, y: self.y + other.y }
     }
 
+    fn sub(self, other: Self) -> Self {
+        Self { x: self.x - other.x, y: self.y - other.y }
+    }
+
     fn scale(self, factor: f64) -> Self {
         Self { x: self.x * factor, y: self.y * factor }
+    }
+
+    fn norm(self) -> f64 {
+        self.x.hypot(self.y)
     }
 }
 
@@ -31,6 +39,7 @@ pub enum BSplineError {
     InvalidDomain,
     OutOfDomain,
     Degenerate,
+    ZeroDerivative,
     Overflow,
 }
 
@@ -120,6 +129,58 @@ impl BSplineCurve2D {
             return Err(BSplineError::Overflow);
         }
         Ok(result)
+    }
+
+    /// Evaluate the first derivative for degree >= 2.
+    ///
+    /// The derivative is itself represented as a clamped B-spline of degree p-1
+    /// using the standard differentiated control polygon and trimmed knot vector.
+    /// Degree-one derivatives are intentionally unsupported because this kernel
+    /// currently does not represent degree-zero B-splines as curves.
+    pub fn derivative_at(&self, parameter: f64) -> Result<Point2, BSplineError> {
+        self.validate()?;
+        if self.degree < 2 {
+            return Err(BSplineError::DerivativeDegreeUnsupported);
+        }
+        if !parameter.is_finite() {
+            return Err(BSplineError::NonFinite);
+        }
+        let (start, end) = self.parameter_domain_unchecked();
+        if parameter < start || parameter > end {
+            return Err(BSplineError::OutOfDomain);
+        }
+
+        let p = self.degree as f64;
+        let mut derivative_points = Vec::with_capacity(self.control_points.len() - 1);
+        for i in 0..self.control_points.len() - 1 {
+            let denominator = self.knots[i + self.degree + 1] - self.knots[i + 1];
+            let numerator = self.control_points[i + 1].sub(self.control_points[i]);
+            let point = if denominator == 0.0 {
+                Point2 { x: 0.0, y: 0.0 }
+            } else {
+                numerator.scale(p / denominator)
+            };
+            if !point.x.is_finite() || !point.y.is_finite() {
+                return Err(BSplineError::Overflow);
+            }
+            derivative_points.push(point);
+        }
+
+        let derivative_knots = self.knots[1..self.knots.len() - 1].to_vec();
+        let derivative_curve = Self::new(self.degree - 1, derivative_points, derivative_knots);
+        derivative_curve.point_at(parameter)
+    }
+
+    pub fn tangent_at(&self, parameter: f64) -> Result<Point2, BSplineError> {
+        let derivative = self.derivative_at(parameter)?;
+        let norm = derivative.norm();
+        if !norm.is_finite() {
+            return Err(BSplineError::Overflow);
+        }
+        if norm == 0.0 {
+            return Err(BSplineError::ZeroDerivative);
+        }
+        Ok(derivative.scale(1.0 / norm))
     }
 
     pub fn control_hull_bounds(&self) -> Result<BoundingBox2, BSplineError> {
