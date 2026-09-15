@@ -10,10 +10,21 @@ pub struct Point3 {
 }
 
 impl Point3 {
-    pub fn distance(self, other: Self) -> f64 { (self.x - other.x).hypot((self.y - other.y).hypot(self.z - other.z)) }
-    pub fn vector_to(self, other: Self) -> Self { Self { x: other.x - self.x, y: other.y - self.y, z: other.z - self.z } }
-    pub fn dot(self, other: Self) -> f64 { self.x * other.x + self.y * other.y + self.z * other.z }
-    pub fn norm(self) -> f64 { self.x.hypot(self.y.hypot(self.z)) }
+    pub fn distance(self, other: Self) -> f64 {
+        (self.x - other.x).hypot((self.y - other.y).hypot(self.z - other.z))
+    }
+
+    pub fn vector_to(self, other: Self) -> Self {
+        Self { x: other.x - self.x, y: other.y - self.y, z: other.z - self.z }
+    }
+
+    pub fn dot(self, other: Self) -> f64 {
+        self.x * other.x + self.y * other.y + self.z * other.z
+    }
+
+    pub fn norm(self) -> f64 {
+        self.x.hypot(self.y.hypot(self.z))
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -21,10 +32,14 @@ pub struct BoundingBox3 { pub min: Point3, pub max: Point3 }
 
 #[derive(Error, Clone, Copy, Debug, PartialEq)]
 pub enum SurfaceError {
-    #[error("surface contains non-finite values")] NonFinite,
-    #[error("surface width and depth must be positive")] InvalidExtent,
-    #[error("surface radius must be positive")] InvalidRadius,
-    #[error("surface parameter is outside the unit domain")] OutOfDomain,
+    #[error("surface contains non-finite values")]
+    NonFinite,
+    #[error("surface width and depth must be positive")]
+    InvalidExtent,
+    #[error("surface radius must be positive")]
+    InvalidRadius,
+    #[error("surface parameter is outside the unit domain")]
+    OutOfDomain,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -107,6 +122,66 @@ impl SphereSurface {
         self.validate()?; validate_finite_delta(dx, dy, dz)?;
         let center = Point3 { x: self.center_point.x + dx, y: self.center_point.y + dy, z: self.center_point.z + dz }; validate_point(center)?;
         Ok(Self { center_point: center, radius_value: self.radius_value })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CylinderSurface { pub center_point: Point3, pub radius_value: f64, pub height_value: f64 }
+
+impl CylinderSurface {
+    pub fn new(center: Point3, radius: f64, height: f64) -> Self { Self { center_point: center, radius_value: radius, height_value: height } }
+    pub fn center(&self) -> Point3 { self.center_point }
+    pub fn radius(&self) -> f64 { self.radius_value }
+    pub fn height(&self) -> f64 { self.height_value }
+    pub fn validate(&self) -> Result<(), SurfaceError> {
+        validate_point(self.center_point)?;
+        if !self.radius_value.is_finite() || !self.height_value.is_finite() { return Err(SurfaceError::NonFinite); }
+        if self.radius_value <= 0.0 { return Err(SurfaceError::InvalidRadius); }
+        if self.height_value <= 0.0 { return Err(SurfaceError::InvalidExtent); }
+        if !self.area().is_finite() { return Err(SurfaceError::NonFinite); }
+        let r = self.radius_value; let h = self.height_value * 0.5;
+        let values = [self.center_point.x - r, self.center_point.x + r, self.center_point.y - r, self.center_point.y + r, self.center_point.z - h, self.center_point.z + h];
+        if values.iter().any(|value| !value.is_finite()) { return Err(SurfaceError::NonFinite); }
+        Ok(())
+    }
+    pub fn area(&self) -> f64 { 2.0 * PI * self.radius_value * self.height_value }
+    pub fn point_at(&self, u: f64, v: f64) -> Result<Point3, SurfaceError> {
+        self.validate()?; validate_parameters(u, v)?;
+        let azimuth = 2.0 * PI * u;
+        let result = Point3 {
+            x: self.center_point.x + self.radius_value * azimuth.sin(),
+            y: self.center_point.y + self.radius_value * azimuth.cos(),
+            z: self.center_point.z + (v - 0.5) * self.height_value,
+        };
+        validate_point(result)?; Ok(result)
+    }
+    pub fn normal_at(&self, u: f64, v: f64) -> Result<Point3, SurfaceError> {
+        self.validate()?; validate_parameters(u, v)?;
+        let azimuth = 2.0 * PI * u;
+        Ok(Point3 { x: azimuth.sin(), y: azimuth.cos(), z: 0.0 })
+    }
+    pub fn bounding_box(&self) -> Result<BoundingBox3, SurfaceError> {
+        self.validate()?; let r = self.radius_value; let h = self.height_value * 0.5;
+        Ok(BoundingBox3 { min: Point3 { x: self.center_point.x - r, y: self.center_point.y - r, z: self.center_point.z - h }, max: Point3 { x: self.center_point.x + r, y: self.center_point.y + r, z: self.center_point.z + h } })
+    }
+    pub fn distance_to_point(&self, point: Point3) -> Result<f64, SurfaceError> {
+        self.validate()?; validate_point(point)?;
+        let radial = (point.x - self.center_point.x).hypot(point.y - self.center_point.y);
+        let radial_error = (radial - self.radius_value).abs();
+        let half_height = self.height_value * 0.5;
+        let axial_error = if point.z < self.center_point.z - half_height {
+            self.center_point.z - half_height - point.z
+        } else if point.z > self.center_point.z + half_height {
+            point.z - (self.center_point.z + half_height)
+        } else {
+            0.0
+        };
+        Ok(radial_error.hypot(axial_error))
+    }
+    pub fn translated(&self, dx: f64, dy: f64, dz: f64) -> Result<Self, SurfaceError> {
+        self.validate()?; validate_finite_delta(dx, dy, dz)?;
+        let center = Point3 { x: self.center_point.x + dx, y: self.center_point.y + dy, z: self.center_point.z + dz }; validate_point(center)?;
+        Ok(Self { center_point: center, radius_value: self.radius_value, height_value: self.height_value })
     }
 }
 
