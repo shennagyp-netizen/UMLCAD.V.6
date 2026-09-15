@@ -8,10 +8,6 @@ impl Point2 {
     fn add(self, other: Self) -> Self {
         Self { x: self.x + other.x, y: self.y + other.y }
     }
-
-    fn scale(self, factor: f64) -> Self {
-        Self { x: self.x * factor, y: self.y * factor }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
