@@ -103,11 +103,11 @@ impl TrimmedNurbsSurface3DDefinition {
             {
                 return Err(TrimmedSurfaceDefinitionError::LoopOutOfDomain);
             }
-            if loop_.signed_area2() == 0.0 {
-                return Err(TrimmedSurfaceDefinitionError::DegenerateLoop);
-            }
             if has_self_intersection(loop_) {
                 return Err(TrimmedSurfaceDefinitionError::SelfIntersectingLoop);
+            }
+            if loop_.signed_area2() == 0.0 {
+                return Err(TrimmedSurfaceDefinitionError::DegenerateLoop);
             }
             if index == 0 {
                 if loop_.signed_area2() <= 0.0 {
@@ -204,10 +204,10 @@ fn segments_intersect(
     let o2 = cross(a, b, d);
     let o3 = cross(c, d, a);
     let o4 = cross(c, d, b);
-    if o1 == 0.0 && on_segment(a, b, c) || o2 == 0.0 && on_segment(a, b, d) {
+    if (o1 == 0.0 && on_segment(a, b, c)) || (o2 == 0.0 && on_segment(a, b, d)) {
         return true;
     }
-    if o3 == 0.0 && on_segment(c, d, a) || o4 == 0.0 && on_segment(c, d, b) {
+    if (o3 == 0.0 && on_segment(c, d, a)) || (o4 == 0.0 && on_segment(c, d, b)) {
         return true;
     }
     ((o1 > 0.0) != (o2 > 0.0)) && ((o3 > 0.0) != (o4 > 0.0))
@@ -265,10 +265,10 @@ mod tests {
     #[test]
     fn self_intersection_is_rejected() {
         let bow_tie = TrimLoop2D::new(vec![
-            ParameterPoint2 { u: 0.0, v: 0.0 },
-            ParameterPoint2 { u: 1.0, v: 1.0 },
-            ParameterPoint2 { u: 0.0, v: 1.0 },
-            ParameterPoint2 { u: 1.0, v: 0.0 },
+            ParameterPoint2 { u: 0.1, v: 0.1 },
+            ParameterPoint2 { u: 0.9, v: 0.9 },
+            ParameterPoint2 { u: 0.1, v: 0.8 },
+            ParameterPoint2 { u: 0.9, v: 0.2 },
         ]);
         assert_eq!(
             TrimmedNurbsSurface3DDefinition::new(plane(), vec![bow_tie]).validate(),
@@ -279,10 +279,10 @@ mod tests {
     #[test]
     fn hole_outside_outer_loop_is_rejected() {
         let hole = TrimLoop2D::new(vec![
-            ParameterPoint2 { u: 1.0, v: 0.1 },
-            ParameterPoint2 { u: 1.0, v: 0.2 },
-            ParameterPoint2 { u: 0.9, v: 0.2 },
             ParameterPoint2 { u: 0.9, v: 0.1 },
+            ParameterPoint2 { u: 0.9, v: 0.2 },
+            ParameterPoint2 { u: 1.0, v: 0.2 },
+            ParameterPoint2 { u: 1.0, v: 0.1 },
         ]);
         assert_eq!(
             TrimmedNurbsSurface3DDefinition::new(plane(), vec![outer(), hole]).validate(),
