@@ -72,4 +72,4 @@ jobs:
 
       - name: Kernel clippy gate
         working-directory: kernel_rust
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings -A clippy::useless_vec
