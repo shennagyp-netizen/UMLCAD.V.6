@@ -20,17 +20,8 @@ fn sphere_surface_has_exact_area_parameterization_normal_and_distance() {
     let center_to_point = s.center().vector_to(p);
     assert!((center_to_point.dot(n) - 5.0).abs() < 1e-12);
 
-    assert!(s
-        .distance_to_point(Point3 { x: 1.0, y: -2.0, z: 8.0 })
-        .unwrap()
-        .abs()
-        < 1e-12);
-    assert!((s
-        .distance_to_point(Point3 { x: 1.0, y: -2.0, z: 13.0 })
-        .unwrap()
-        - 5.0)
-        .abs()
-        < 1e-12);
+    assert!(s.distance_to_point(Point3 { x: 1.0, y: -2.0, z: 8.0 }).unwrap().abs() < 1e-12);
+    assert!((s.distance_to_point(Point3 { x: 1.0, y: -2.0, z: 13.0 }).unwrap() - 5.0).abs() < 1e-12);
 }
 
 #[test]
