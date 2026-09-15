@@ -74,8 +74,8 @@ impl TrimmedNurbsSurfaceBackend for OcctBackend {
         let raw = NonNull::new(raw).ok_or(GeometryError::Unsupported("OCCT returned null"))?;
         let shape = OcctShape::from_raw(raw, GeometryKind::Surface);
         let validation = self.validate(&shape, tolerance)?;
-        if !validation.valid || !validation.manifold {
-            return Err(GeometryError::Unsupported("OCCT produced an invalid or non-manifold trimmed face"));
+        if !validation.valid {
+            return Err(GeometryError::Unsupported("OCCT produced an invalid trimmed face"));
         }
         Ok(GeometryResult {
             shape,
@@ -131,6 +131,7 @@ mod tests {
         assert_eq!(result.kind, GeometryKind::Surface);
         assert_eq!(backend.topology_counts(&result.shape, TOLERANCE).unwrap().faces, 1);
         assert!(backend.validate(&result.shape, TOLERANCE).unwrap().valid);
+        assert!(!backend.validate(&result.shape, TOLERANCE).unwrap().manifold);
     }
 
     #[test]
@@ -153,6 +154,7 @@ mod tests {
         assert_eq!(backend.topology_counts(&trimmed.shape, TOLERANCE).unwrap().faces, 1);
         assert!(trimmed_area < full_area);
         assert!(trimmed_area > 0.0);
+        assert!(!backend.validate(&trimmed.shape, TOLERANCE).unwrap().manifold);
     }
 
     #[test]
