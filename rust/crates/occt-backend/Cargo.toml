@@ -9,6 +9,7 @@ build = "build.rs"
 umlcad-v6-geometry-api = { path = "../geometry-api" }
 umlcad-v6-freeform-api = { path = "../freeform-api" }
 umlcad-v6-nurbs-surface-api = { path = "../nurbs-surface-api" }
+umlcad-v6-surface-operations-api = { path = "../surface-operations-api" }
 umlcad-v6-mesh-api = { path = "../mesh-api" }
 umlcad-v6-exchange-api = { path = "../exchange-api" }
 
