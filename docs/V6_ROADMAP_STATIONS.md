@@ -4,9 +4,9 @@ This document is the live station map for the V6 geometry-kernel program. The ma
 
 ## Current station
 
-**S10 — NURBS surface differential/backend conformance — NEXT / CURRENT**
+**S11 — Freeform face construction and trimming — CURRENT**
 
-S8 and S9 are complete. The semantic NURBS surface mathematics and exact differential contracts already exist; S9 added the OCCT reference realization without making OCCT the mathematical authority.
+S8, S9, and S10 are complete. The NURBS surface mathematical authority, native OCCT realization, and native-versus-mathematical differential conformance gate are now established.
 
 ## Completed stations
 
@@ -35,31 +35,46 @@ The already-defined backend-neutral `NurbsSurface3DDefinition` contract is now r
 6. bilinear, rational, invalid-definition, and deterministic-construction tests are present;
 7. surface construction remains separate from future trimmed-face topology.
 
-**S9 exit condition:** satisfied by the full authoritative OCCT TDD matrix: workspace debug/release tests, Clippy, kernel debug/release tests, kernel source/test Clippy, and formatting gates all passed on PR #41 before merge to `main`.
+**S9 exit condition:** satisfied by the full authoritative OCCT TDD matrix on PR #41 before merge to `main`.
 
-## Immediate next station
+### S10 — NURBS surface differential/backend conformance — COMPLETE
 
-### S10 — NURBS surface differential/backend conformance
+The objective was to prove that the native surface realization remains faithful to the independent semantic mathematics rather than using OCCT as the authority.
 
-The goal is **not** to invent the mathematical layer; it already exists. The goal is to prove that the native surface realization is mathematically faithful to it.
+Completed work:
 
-Required work:
+1. backend-neutral first/second differential contract;
+2. independent tensor-product rational differential evaluator with explicit homogeneous-to-Euclidean quotient rules;
+3. normal computation with explicit degenerate-normal handling;
+4. second-order continuity policy for interior knot queries;
+5. native OCCT `Geom_Surface::D2` measurement behind the opaque backend boundary;
+6. numerical differential conformance between native OCCT results and the independent semantic evaluator;
+7. non-finite parameter rejection and deterministic native behavior;
+8. low-degree surface handling where second derivatives are identically zero;
+9. full release/debug, format, Clippy, kernel test, and kernel Clippy gates passed on PR #42.
 
-1. expose or add backend measurements/evaluation needed to compare native NURBS surface points with the semantic evaluator;
-2. compare first and second partial derivatives against the independent mathematical implementation/oracle;
-3. verify normals and cross-product orientation where regular;
-4. explicitly classify singular/degenerate parameter cases rather than returning plausible but invalid values;
-5. test rational and non-rational surfaces, interior knots, non-unit parameter domains, and asymmetric U/V degrees;
-6. preserve tolerance separation: mathematical comparison tolerance must not become hidden modeling tolerance;
-7. establish deterministic conformance evidence suitable for later trimmed B-Rep construction.
+**S10 exit condition:** satisfied by the fully green authoritative CI matrix on PR #42. Merge commit: `ae5b0236cda3a792f27b63883835190e3c149f90`.
 
-**Station exit condition:** native and mathematical results agree within explicitly declared numerical bounds across regular and adversarial cases, with singular cases explicitly diagnosed and no OCCT types exposed through the semantic API.
-
-## Following stations
+## Current station
 
 ### S11 — Freeform face construction and trimming
 
 Promote validated NURBS surfaces into B-Rep faces with explicit trimming wires/edges. Establish orientation, parameter-space versus 3D curve consistency, closure, seam handling, and manifold validation. No guessed topology identity.
+
+Required work:
+
+1. define a backend-neutral trimmed-face contract independent of OCCT topology types;
+2. define explicit outer and inner trimming-loop semantics in surface parameter space;
+3. construct and validate 3D boundary curves from semantic curves and surface restrictions;
+4. establish wire closure, edge orientation, face orientation, and seam rules;
+5. verify that trimming curves remain geometrically consistent with the underlying surface within declared validation tolerance;
+6. construct an opaque native B-Rep face only after semantic validation succeeds;
+7. add independent point-on-surface/curve and loop-closure checks plus adversarial self-intersection and degeneracy cases;
+8. preserve deterministic references/evidence and fail closed on unsupported topology.
+
+**S11 exit condition:** a semantic trimmed-face definition can be validated independently, realized by the OCCT backend, and proven to preserve boundary geometry, orientation, closure, and manifold validity without exposing OCCT topology through the semantic API.
+
+## Following stations
 
 ### S12 — Surface-surface / curve-surface operations
 
