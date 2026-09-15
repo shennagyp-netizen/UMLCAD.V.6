@@ -10,8 +10,24 @@ impl Point3 {
         Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
     }
 
+    fn sub(self, other: Self) -> Self {
+        Self { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z }
+    }
+
     fn scale(self, factor: f64) -> Self {
         Self { x: self.x * factor, y: self.y * factor, z: self.z * factor }
+    }
+
+    fn cross(self, other: Self) -> Self {
+        Self {
+            x: self.y * other.z - self.z * other.y,
+            y: self.z * other.x - self.x * other.z,
+            z: self.x * other.y - self.y * other.x,
+        }
+    }
+
+    fn norm(self) -> f64 {
+        self.x.hypot(self.y.hypot(self.z))
     }
 }
 
@@ -35,6 +51,7 @@ pub enum NurbsSurfaceError {
     OutOfDomain,
     Degenerate,
     ZeroProjectiveWeight,
+    ZeroNormal,
     Overflow,
 }
 
@@ -108,53 +125,36 @@ impl NurbsSurface2D {
 
     pub fn point_at(&self, u: f64, v: f64) -> Result<Point3, NurbsSurfaceError> {
         self.validate()?;
-        if !u.is_finite() || !v.is_finite() {
-            return Err(NurbsSurfaceError::NonFinite);
-        }
-        let (u0, u1, v0, v1) = self.parameter_domain_unchecked();
-        if u < u0 || u > u1 || v < v0 || v > v1 {
-            return Err(NurbsSurfaceError::OutOfDomain);
-        }
+        let base = self.evaluate_homogeneous(u, v)?;
+        dehomogenize(base)
+    }
 
-        let u_count = self.control_count_u();
-        let v_count = self.control_count_v();
-        let u_span = find_span(u, self.degree_u, &self.knots_u, u_count);
-        let mut row_reduced = Vec::with_capacity(v_count);
+    pub fn derivative_u_at(&self, u: f64, v: f64) -> Result<Point3, NurbsSurfaceError> {
+        self.validate()?;
+        let base = self.evaluate_homogeneous(u, v)?;
+        let derivative = self.evaluate_homogeneous_derivative_u(u, v)?;
+        quotient_derivative(base, derivative)
+    }
 
-        for v_index in 0..v_count {
-            let mut work = Vec::with_capacity(self.degree_u + 1);
-            for local in 0..=self.degree_u {
-                let u_index = u_span - self.degree_u + local;
-                let index = u_index * v_count + v_index;
-                let point = self.control_points[index];
-                let weight = self.weights[index];
-                work.push(HomogeneousPoint {
-                    xw: point.x * weight,
-                    yw: point.y * weight,
-                    zw: point.z * weight,
-                    w: weight,
-                });
-            }
-            row_reduced.push(de_boor_homogeneous(u, u_span, self.degree_u, &self.knots_u, &mut work));
-        }
+    pub fn derivative_v_at(&self, u: f64, v: f64) -> Result<Point3, NurbsSurfaceError> {
+        self.validate()?;
+        let base = self.evaluate_homogeneous(u, v)?;
+        let derivative = self.evaluate_homogeneous_derivative_v(u, v)?;
+        quotient_derivative(base, derivative)
+    }
 
-        let v_span = find_span(v, self.degree_v, &self.knots_v, v_count);
-        let mut work = Vec::with_capacity(self.degree_v + 1);
-        for local in 0..=self.degree_v {
-            work.push(row_reduced[v_span - self.degree_v + local]);
-        }
-        let result = de_boor_homogeneous(v, v_span, self.degree_v, &self.knots_v, &mut work);
-        if !result.xw.is_finite() || !result.yw.is_finite() || !result.zw.is_finite() || !result.w.is_finite() {
+    pub fn normal_at(&self, u: f64, v: f64) -> Result<Point3, NurbsSurfaceError> {
+        let du = self.derivative_u_at(u, v)?;
+        let dv = self.derivative_v_at(u, v)?;
+        let normal = du.cross(dv);
+        let magnitude = normal.norm();
+        if !magnitude.is_finite() {
             return Err(NurbsSurfaceError::Overflow);
         }
-        if result.w <= 0.0 {
-            return Err(NurbsSurfaceError::ZeroProjectiveWeight);
+        if magnitude == 0.0 {
+            return Err(NurbsSurfaceError::ZeroNormal);
         }
-        let point = Point3 { x: result.xw / result.w, y: result.yw / result.w, z: result.zw / result.w };
-        if !point.x.is_finite() || !point.y.is_finite() || !point.z.is_finite() {
-            return Err(NurbsSurfaceError::Overflow);
-        }
-        Ok(point)
+        Ok(normal.scale(1.0 / magnitude))
     }
 
     pub fn control_hull_bounds(&self) -> Result<BoundingBox3, NurbsSurfaceError> {
@@ -192,13 +192,139 @@ impl NurbsSurface2D {
         ))
     }
 
+    fn evaluate_homogeneous(&self, u: f64, v: f64) -> Result<HomogeneousPoint, NurbsSurfaceError> {
+        self.validate_parameters(u, v)?;
+        let u_count = self.control_count_u();
+        let v_count = self.control_count_v();
+        let u_span = find_span(u, self.degree_u, &self.knots_u, u_count);
+        let mut row_reduced = Vec::with_capacity(v_count);
+
+        for v_index in 0..v_count {
+            let mut work = Vec::with_capacity(self.degree_u + 1);
+            for local in 0..=self.degree_u {
+                let u_index = u_span - self.degree_u + local;
+                let index = u_index * v_count + v_index;
+                let point = self.control_points[index];
+                let weight = self.weights[index];
+                work.push(HomogeneousPoint {
+                    xw: point.x * weight,
+                    yw: point.y * weight,
+                    zw: point.z * weight,
+                    w: weight,
+                });
+            }
+            row_reduced.push(de_boor_homogeneous(u, u_span, self.degree_u, &self.knots_u, &mut work));
+        }
+
+        let v_span = find_span(v, self.degree_v, &self.knots_v, v_count);
+        let mut work = Vec::with_capacity(self.degree_v + 1);
+        for local in 0..=self.degree_v {
+            work.push(row_reduced[v_span - self.degree_v + local]);
+        }
+        Ok(de_boor_homogeneous(v, v_span, self.degree_v, &self.knots_v, &mut work))
+    }
+
+    fn evaluate_homogeneous_derivative_u(&self, u: f64, v: f64) -> Result<HomogeneousPoint, NurbsSurfaceError> {
+        self.validate_parameters(u, v)?;
+        if self.degree_u == 0 {
+            return Err(NurbsSurfaceError::InvalidDegree);
+        }
+        let u_count = self.control_count_u();
+        let v_count = self.control_count_v();
+        let derivative_u_count = u_count - 1;
+        let derivative_knots_u = &self.knots_u[1..self.knots_u.len() - 1];
+        let u_span = find_span(u, self.degree_u - 1, derivative_knots_u, derivative_u_count);
+        let mut row_reduced = Vec::with_capacity(v_count);
+
+        for v_index in 0..v_count {
+            let mut work = Vec::with_capacity(self.degree_u);
+            for local in 0..self.degree_u {
+                let i = u_span - (self.degree_u - 1) + local;
+                let index = i * v_count + v_index;
+                let next_index = (i + 1) * v_count + v_index;
+                let left = self.control_points[index];
+                let right = self.control_points[next_index];
+                let left_weight = self.weights[index];
+                let right_weight = self.weights[next_index];
+                let denominator = self.knots_u[i + self.degree_u + 1] - self.knots_u[i + 1];
+                let factor = self.degree_u as f64 / denominator;
+                work.push(HomogeneousPoint {
+                    xw: (right.x * right_weight - left.x * left_weight) * factor,
+                    yw: (right.y * right_weight - left.y * left_weight) * factor,
+                    zw: (right.z * right_weight - left.z * left_weight) * factor,
+                    w: (right_weight - left_weight) * factor,
+                });
+            }
+            row_reduced.push(de_boor_homogeneous(u, u_span, self.degree_u - 1, derivative_knots_u, &mut work));
+        }
+
+        let v_span = find_span(v, self.degree_v, &self.knots_v, v_count);
+        let mut work = Vec::with_capacity(self.degree_v + 1);
+        for local in 0..=self.degree_v {
+            work.push(row_reduced[v_span - self.degree_v + local]);
+        }
+        Ok(de_boor_homogeneous(v, v_span, self.degree_v, &self.knots_v, &mut work))
+    }
+
+    fn evaluate_homogeneous_derivative_v(&self, u: f64, v: f64) -> Result<HomogeneousPoint, NurbsSurfaceError> {
+        self.validate_parameters(u, v)?;
+        if self.degree_v == 0 {
+            return Err(NurbsSurfaceError::InvalidDegree);
+        }
+        let u_count = self.control_count_u();
+        let v_count = self.control_count_v();
+        let derivative_v_count = v_count - 1;
+        let derivative_knots_v = &self.knots_v[1..self.knots_v.len() - 1];
+        let v_span = find_span(v, self.degree_v - 1, derivative_knots_v, derivative_v_count);
+        let u_span = find_span(u, self.degree_u, &self.knots_u, u_count);
+        let mut reduced_rows = Vec::with_capacity(u_count);
+
+        for u_index in 0..u_count {
+            let mut work = Vec::with_capacity(self.degree_v);
+            for local in 0..self.degree_v {
+                let j = v_span - (self.degree_v - 1) + local;
+                let index = u_index * v_count + j;
+                let next_index = u_index * v_count + j + 1;
+                let left = self.control_points[index];
+                let right = self.control_points[next_index];
+                let left_weight = self.weights[index];
+                let right_weight = self.weights[next_index];
+                let denominator = self.knots_v[j + self.degree_v + 1] - self.knots_v[j + 1];
+                let factor = self.degree_v as f64 / denominator;
+                work.push(HomogeneousPoint {
+                    xw: (right.x * right_weight - left.x * left_weight) * factor,
+                    yw: (right.y * right_weight - left.y * left_weight) * factor,
+                    zw: (right.z * right_weight - left.z * left_weight) * factor,
+                    w: (right_weight - left_weight) * factor,
+                });
+            }
+            reduced_rows.push(de_boor_homogeneous(v, v_span, self.degree_v - 1, derivative_knots_v, &mut work));
+        }
+
+        let mut work = Vec::with_capacity(self.degree_u + 1);
+        for local in 0..=self.degree_u {
+            work.push(reduced_rows[u_span - self.degree_u + local]);
+        }
+        Ok(de_boor_homogeneous(u, u_span, self.degree_u, &self.knots_u, &mut work))
+    }
+
+    fn validate_parameters(&self, u: f64, v: f64) -> Result<(), NurbsSurfaceError> {
+        if !u.is_finite() || !v.is_finite() {
+            return Err(NurbsSurfaceError::NonFinite);
+        }
+        let (u0, u1, v0, v1) = self.parameter_domain_unchecked();
+        if u < u0 || u > u1 || v < v0 || v > v1 {
+            return Err(NurbsSurfaceError::OutOfDomain);
+        }
+        Ok(())
+    }
+
     fn control_count_u(&self) -> usize {
-        // The grid shape is determined from the knot vector and degree.
-        self.knots_u.len() - self.degree_u - 1
+        self.knots_u.len().saturating_sub(self.degree_u + 1)
     }
 
     fn control_count_v(&self) -> usize {
-        self.knots_v.len() - self.degree_v - 1
+        self.knots_v.len().saturating_sub(self.degree_v + 1)
     }
 
     fn parameter_domain_unchecked(&self) -> (f64, f64, f64, f64) {
@@ -228,6 +354,43 @@ impl HomogeneousPoint {
             w: self.w * (1.0 - alpha) + other.w * alpha,
         }
     }
+}
+
+fn dehomogenize(result: HomogeneousPoint) -> Result<Point3, NurbsSurfaceError> {
+    if !result.xw.is_finite() || !result.yw.is_finite() || !result.zw.is_finite() || !result.w.is_finite() {
+        return Err(NurbsSurfaceError::Overflow);
+    }
+    if result.w <= 0.0 {
+        return Err(NurbsSurfaceError::ZeroProjectiveWeight);
+    }
+    let point = Point3 { x: result.xw / result.w, y: result.yw / result.w, z: result.zw / result.w };
+    if !point.x.is_finite() || !point.y.is_finite() || !point.z.is_finite() {
+        return Err(NurbsSurfaceError::Overflow);
+    }
+    Ok(point)
+}
+
+fn quotient_derivative(base: HomogeneousPoint, derivative: HomogeneousPoint) -> Result<Point3, NurbsSurfaceError> {
+    let values = [base.xw, base.yw, base.zw, base.w, derivative.xw, derivative.yw, derivative.zw, derivative.w];
+    if values.iter().any(|x| !x.is_finite()) {
+        return Err(NurbsSurfaceError::Overflow);
+    }
+    if base.w <= 0.0 {
+        return Err(NurbsSurfaceError::ZeroProjectiveWeight);
+    }
+    let w2 = base.w * base.w;
+    if !w2.is_finite() || w2 == 0.0 {
+        return Err(NurbsSurfaceError::Overflow);
+    }
+    let result = Point3 {
+        x: (derivative.xw * base.w - base.xw * derivative.w) / w2,
+        y: (derivative.yw * base.w - base.yw * derivative.w) / w2,
+        z: (derivative.zw * base.w - base.zw * derivative.w) / w2,
+    };
+    if !result.x.is_finite() || !result.y.is_finite() || !result.z.is_finite() {
+        return Err(NurbsSurfaceError::Overflow);
+    }
+    Ok(result)
 }
 
 fn validate_knot_vector(knots: &[f64]) -> Result<(), NurbsSurfaceError> {
@@ -287,6 +450,9 @@ fn de_boor_homogeneous(
     knots: &[f64],
     work: &mut [HomogeneousPoint],
 ) -> HomogeneousPoint {
+    if degree == 0 {
+        return work[0];
+    }
     for level in 1..=degree {
         for j in (level..=degree).rev() {
             let i = span - degree + j;
@@ -322,6 +488,6 @@ mod tests {
         let q = surface.point_at(0.25, 0.75).unwrap();
         assert!((q.x - 0.25).abs() < 1e-12);
         assert!((q.y - 0.75).abs() < 1e-12);
-        assert!((q.z - 1.25).abs() < 1e-12);
+        assert!((q.z - 1.75).abs() < 1e-12);
     }
 }
