@@ -1,3 +1,5 @@
+use umlcad_v6_geometry_api::{GeometryBackend, GeometryError};
+
 pub mod validation;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -89,6 +91,14 @@ impl Mesh {
         }
         Ok(())
     }
+}
+
+pub trait TessellationBackend: GeometryBackend {
+    fn tessellate(
+        &self,
+        shape: &Self::Shape,
+        options: TessellationOptions,
+    ) -> Result<Mesh, GeometryError>;
 }
 
 #[cfg(test)]
