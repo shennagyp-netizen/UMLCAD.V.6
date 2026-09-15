@@ -1,4 +1,4 @@
-use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceEvaluationError, Point3};
+use umlcad_v6_nurbs_surface_api::{NurbsCurve3DDefinition, NurbsSurface3DDefinition, NurbsSurfaceEvaluationError, Point3};
 
 mod curve_split;
 mod curve_surface;
@@ -12,7 +12,8 @@ pub use curve_surface::{
     CurveSurfaceIntersectionResult, NurbsCurveSurfaceOperations,
 };
 pub use planar_nurbs_relation::{
-    classify_planar_nurbs_surface_relation, PlanarNurbsSurfaceRelation, Plane3D,
+    classify_planar_nurbs_surface_relation, PlanarNurbsSurfaceRelation, PlanarNurbsSurfaceRelationError,
+    Plane3D,
 };
 pub use point_surface::{
     closest_point_on_planar_nurbs_surface, PointSurfaceClosestPoint,
