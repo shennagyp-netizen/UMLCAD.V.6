@@ -13,17 +13,13 @@ fn common_and_cut_produce_valid_results() {
     let backend = OcctBackend::new();
     let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
     let right = shifted_box(&backend, 5.0);
-
     let common = backend.common(&left, &right, TOLERANCE).unwrap().shape;
     let cut = backend.cut(&left, &right, TOLERANCE).unwrap().shape;
-
     assert!(backend.validate(&common, TOLERANCE).unwrap().valid);
     assert!(backend.validate(&cut, TOLERANCE).unwrap().valid);
-
     let common_bounds = backend.bounding_box(&common, TOLERANCE).unwrap();
     assert!((common_bounds.min_x - 5.0).abs() <= 1e-9);
     assert!((common_bounds.max_x - 10.0).abs() <= 1e-9);
-
     let cut_bounds = backend.bounding_box(&cut, TOLERANCE).unwrap();
     assert!((cut_bounds.min_x - 0.0).abs() <= 1e-9);
     assert!((cut_bounds.max_x - 5.0).abs() <= 1e-9);
@@ -34,12 +30,9 @@ fn disjoint_fuse_remains_a_valid_multi_solid_result() {
     let backend = OcctBackend::new();
     let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
     let right = shifted_box(&backend, 20.0);
-
     let fused = backend.fuse(&left, &right, TOLERANCE).unwrap().shape;
-
     assert!(backend.validate(&fused, TOLERANCE).unwrap().valid);
     assert_eq!(backend.topology_counts(&fused, TOLERANCE).unwrap().solids, 2);
-
     let bounds = backend.bounding_box(&fused, TOLERANCE).unwrap();
     assert!((bounds.min_x - 0.0).abs() <= 1e-9);
     assert!((bounds.max_x - 30.0).abs() <= 1e-9);
@@ -50,11 +43,7 @@ fn disjoint_common_is_rejected_as_unrepresentable_empty_geometry() {
     let backend = OcctBackend::new();
     let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
     let right = shifted_box(&backend, 20.0);
-
-    assert!(matches!(
-        backend.common(&left, &right, TOLERANCE),
-        Err(GeometryError::Unsupported(_))
-    ));
+    assert!(matches!(backend.common(&left, &right, TOLERANCE), Err(GeometryError::Unsupported(_))));
 }
 
 #[test]
@@ -62,11 +51,45 @@ fn full_containment_cut_is_rejected_when_result_is_empty() {
     let backend = OcctBackend::new();
     let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
     let inner = backend.box_solid(20.0, 20.0, 20.0, TOLERANCE).unwrap().shape;
+    assert!(matches!(backend.cut(&left, &inner, TOLERANCE), Err(GeometryError::Unsupported(_))));
+}
 
-    assert!(matches!(
-        backend.cut(&left, &inner, TOLERANCE),
-        Err(GeometryError::Unsupported(_))
-    ));
+#[test]
+fn face_touching_fuse_remains_one_valid_solid() {
+    let backend = OcctBackend::new();
+    let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+    let right = shifted_box(&backend, 10.0);
+    let fused = backend.fuse(&left, &right, TOLERANCE).unwrap().shape;
+    assert!(backend.validate(&fused, TOLERANCE).unwrap().valid);
+    assert_eq!(backend.topology_counts(&fused, TOLERANCE).unwrap().solids, 1);
+    let bounds = backend.bounding_box(&fused, TOLERANCE).unwrap();
+    assert!((bounds.min_x - 0.0).abs() <= 1e-9);
+    assert!((bounds.max_x - 20.0).abs() <= 1e-9);
+}
+
+#[test]
+fn face_touching_common_is_rejected_as_zero_volume_intersection() {
+    let backend = OcctBackend::new();
+    let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+    let right = shifted_box(&backend, 10.0);
+    assert!(matches!(backend.common(&left, &right, TOLERANCE), Err(GeometryError::Unsupported(_))));
+}
+
+#[test]
+fn coincident_boxes_have_explicit_boolean_semantics() {
+    let backend = OcctBackend::new();
+    let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+    let right = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+
+    let fused = backend.fuse(&left, &right, TOLERANCE).unwrap().shape;
+    assert_eq!(backend.topology_counts(&fused, TOLERANCE).unwrap().solids, 1);
+    assert!(backend.validate(&fused, TOLERANCE).unwrap().valid);
+
+    let common = backend.common(&left, &right, TOLERANCE).unwrap().shape;
+    assert_eq!(backend.topology_counts(&common, TOLERANCE).unwrap().solids, 1);
+    assert!(backend.validate(&common, TOLERANCE).unwrap().valid);
+
+    assert!(matches!(backend.cut(&left, &right, TOLERANCE), Err(GeometryError::Unsupported(_))));
 }
 
 #[test]
@@ -74,25 +97,10 @@ fn boolean_results_are_deterministic_for_identical_operands() {
     let backend = OcctBackend::new();
     let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
     let right = shifted_box(&backend, 5.0);
-
     for operation in [0_u8, 1_u8, 2_u8] {
-        let first = match operation {
-            0 => backend.fuse(&left, &right, TOLERANCE).unwrap().shape,
-            1 => backend.common(&left, &right, TOLERANCE).unwrap().shape,
-            _ => backend.cut(&left, &right, TOLERANCE).unwrap().shape,
-        };
-        let second = match operation {
-            0 => backend.fuse(&left, &right, TOLERANCE).unwrap().shape,
-            1 => backend.common(&left, &right, TOLERANCE).unwrap().shape,
-            _ => backend.cut(&left, &right, TOLERANCE).unwrap().shape,
-        };
-        assert_eq!(
-            backend.bounding_box(&first, TOLERANCE).unwrap(),
-            backend.bounding_box(&second, TOLERANCE).unwrap()
-        );
-        assert_eq!(
-            backend.topology_counts(&first, TOLERANCE).unwrap(),
-            backend.topology_counts(&second, TOLERANCE).unwrap()
-        );
+        let first = match operation { 0 => backend.fuse(&left,&right,TOLERANCE).unwrap().shape, 1 => backend.common(&left,&right,TOLERANCE).unwrap().shape, _ => backend.cut(&left,&right,TOLERANCE).unwrap().shape };
+        let second = match operation { 0 => backend.fuse(&left,&right,TOLERANCE).unwrap().shape, 1 => backend.common(&left,&right,TOLERANCE).unwrap().shape, _ => backend.cut(&left,&right,TOLERANCE).unwrap().shape };
+        assert_eq!(backend.bounding_box(&first,TOLERANCE).unwrap(), backend.bounding_box(&second,TOLERANCE).unwrap());
+        assert_eq!(backend.topology_counts(&first,TOLERANCE).unwrap(), backend.topology_counts(&second,TOLERANCE).unwrap());
     }
 }
