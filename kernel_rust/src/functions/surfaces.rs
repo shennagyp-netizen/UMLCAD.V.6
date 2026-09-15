@@ -1,3 +1,5 @@
+use std::f64::consts::PI;
+
 use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -7,11 +9,26 @@ pub struct Point3 {
     pub z: f64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct BoundingBox3 {
-    pub min: Point3,
-    pub max: Point3,
+impl Point3 {
+    pub fn distance(self, other: Self) -> f64 {
+        (self.x - other.x).hypot((self.y - other.y).hypot(self.z - other.z))
+    }
+
+    pub fn vector_to(self, other: Self) -> Self {
+        Self { x: other.x - self.x, y: other.y - self.y, z: other.z - self.z }
+    }
+
+    pub fn dot(self, other: Self) -> f64 {
+        self.x * other.x + self.y * other.y + self.z * other.z
+    }
+
+    pub fn norm(self) -> f64 {
+        self.x.hypot(self.y.hypot(self.z))
+    }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BoundingBox3 { pub min: Point3, pub max: Point3 }
 
 #[derive(Error, Clone, Copy, Debug, PartialEq)]
 pub enum SurfaceError {
@@ -19,144 +36,99 @@ pub enum SurfaceError {
     NonFinite,
     #[error("surface width and depth must be positive")]
     InvalidExtent,
+    #[error("surface radius must be positive")]
+    InvalidRadius,
     #[error("surface parameter is outside the unit domain")]
     OutOfDomain,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PlanarSurface {
-    pub center: Point3,
-    pub width: f64,
-    pub depth: f64,
-}
+pub struct PlanarSurface { pub center: Point3, pub width: f64, pub depth: f64 }
 
 impl PlanarSurface {
-    pub fn new(center: Point3, width: f64, depth: f64) -> Self {
-        Self {
-            center,
-            width,
-            depth,
-        }
-    }
-
+    pub fn new(center: Point3, width: f64, depth: f64) -> Self { Self { center, width, depth } }
     pub fn validate(&self) -> Result<(), SurfaceError> {
-        if !self.center.x.is_finite()
-            || !self.center.y.is_finite()
-            || !self.center.z.is_finite()
-            || !self.width.is_finite()
-            || !self.depth.is_finite()
-        {
-            return Err(SurfaceError::NonFinite);
-        }
-        if self.width <= 0.0 || self.depth <= 0.0 {
-            return Err(SurfaceError::InvalidExtent);
-        }
-        if !self.area().is_finite() {
-            return Err(SurfaceError::NonFinite);
-        }
-        let half_width = self.width * 0.5;
-        let half_depth = self.depth * 0.5;
-        let bounds = [
-            self.center.x - half_width,
-            self.center.x + half_width,
-            self.center.y - half_depth,
-            self.center.y + half_depth,
-        ];
-        if bounds.iter().any(|value| !value.is_finite()) {
-            return Err(SurfaceError::NonFinite);
-        }
+        if !self.center.x.is_finite() || !self.center.y.is_finite() || !self.center.z.is_finite() || !self.width.is_finite() || !self.depth.is_finite() { return Err(SurfaceError::NonFinite); }
+        if self.width <= 0.0 || self.depth <= 0.0 { return Err(SurfaceError::InvalidExtent); }
+        if !self.area().is_finite() { return Err(SurfaceError::NonFinite); }
+        let values = [self.center.x - self.width * 0.5, self.center.x + self.width * 0.5, self.center.y - self.depth * 0.5, self.center.y + self.depth * 0.5];
+        if values.iter().any(|value| !value.is_finite()) { return Err(SurfaceError::NonFinite); }
         Ok(())
     }
-
-    pub fn area(&self) -> f64 {
-        self.width * self.depth
-    }
-
-    pub fn normal(&self) -> Point3 {
-        Point3 {
-            x: 0.0,
-            y: 0.0,
-            z: 1.0,
-        }
-    }
-
+    pub fn area(&self) -> f64 { self.width * self.depth }
+    pub fn normal(&self) -> Point3 { Point3 { x: 0.0, y: 0.0, z: 1.0 } }
     pub fn point_at(&self, u: f64, v: f64) -> Result<Point3, SurfaceError> {
         self.validate()?;
-        if !u.is_finite()
-            || !v.is_finite()
-            || !(0.0..=1.0).contains(&u)
-            || !(0.0..=1.0).contains(&v)
-        {
-            return Err(SurfaceError::OutOfDomain);
-        }
-        Ok(Point3 {
-            x: self.center.x + (u - 0.5) * self.width,
-            y: self.center.y + (v - 0.5) * self.depth,
-            z: self.center.z,
-        })
+        if !u.is_finite() || !v.is_finite() || !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) { return Err(SurfaceError::OutOfDomain); }
+        Ok(Point3 { x: self.center.x + (u - 0.5) * self.width, y: self.center.y + (v - 0.5) * self.depth, z: self.center.z })
     }
-
     pub fn bounding_box(&self) -> Result<BoundingBox3, SurfaceError> {
         self.validate()?;
-        Ok(BoundingBox3 {
-            min: Point3 {
-                x: self.center.x - self.width * 0.5,
-                y: self.center.y - self.depth * 0.5,
-                z: self.center.z,
-            },
-            max: Point3 {
-                x: self.center.x + self.width * 0.5,
-                y: self.center.y + self.depth * 0.5,
-                z: self.center.z,
-            },
-        })
+        Ok(BoundingBox3 { min: Point3 { x: self.center.x - self.width * 0.5, y: self.center.y - self.depth * 0.5, z: self.center.z }, max: Point3 { x: self.center.x + self.width * 0.5, y: self.center.y + self.depth * 0.5, z: self.center.z } })
     }
-
     pub fn distance_to_point(&self, point: Point3) -> Result<f64, SurfaceError> {
         self.validate()?;
-        if !point.x.is_finite() || !point.y.is_finite() || !point.z.is_finite() {
-            return Err(SurfaceError::NonFinite);
-        }
-        let x_min = self.center.x - self.width * 0.5;
-        let x_max = self.center.x + self.width * 0.5;
-        let y_min = self.center.y - self.depth * 0.5;
-        let y_max = self.center.y + self.depth * 0.5;
-        let dx = if point.x < x_min {
-            x_min - point.x
-        } else if point.x > x_max {
-            point.x - x_max
-        } else {
-            0.0
-        };
-        let dy = if point.y < y_min {
-            y_min - point.y
-        } else if point.y > y_max {
-            point.y - y_max
-        } else {
-            0.0
-        };
+        if !point.x.is_finite() || !point.y.is_finite() || !point.z.is_finite() { return Err(SurfaceError::NonFinite); }
+        let xmin = self.center.x - self.width * 0.5; let xmax = self.center.x + self.width * 0.5;
+        let ymin = self.center.y - self.depth * 0.5; let ymax = self.center.y + self.depth * 0.5;
+        let dx = if point.x < xmin { xmin - point.x } else if point.x > xmax { point.x - xmax } else { 0.0 };
+        let dy = if point.y < ymin { ymin - point.y } else if point.y > ymax { point.y - ymax } else { 0.0 };
         Ok(dx.hypot(dy).hypot(point.z - self.center.z))
     }
-
     pub fn translated(&self, dx: f64, dy: f64, dz: f64) -> Result<Self, SurfaceError> {
         self.validate()?;
-        if !dx.is_finite() || !dy.is_finite() || !dz.is_finite() {
-            return Err(SurfaceError::NonFinite);
-        }
-        let center = Point3 {
-            x: self.center.x + dx,
-            y: self.center.y + dy,
-            z: self.center.z + dz,
-        };
-        if !center.x.is_finite() || !center.y.is_finite() || !center.z.is_finite() {
-            return Err(SurfaceError::NonFinite);
-        }
+        if !dx.is_finite() || !dy.is_finite() || !dz.is_finite() { return Err(SurfaceError::NonFinite); }
+        let center = Point3 { x: self.center.x + dx, y: self.center.y + dy, z: self.center.z + dz };
+        if !center.x.is_finite() || !center.y.is_finite() || !center.z.is_finite() { return Err(SurfaceError::NonFinite); }
         Ok(Self { center, ..*self })
     }
 }
 
-impl Point3 {
-    pub fn distance(self, other: Self) -> f64 {
-        (self.x - other.x).hypot((self.y - other.y).hypot(self.z - other.z))
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SphereSurface { pub center_point: Point3, pub radius_value: f64 }
+
+impl SphereSurface {
+    pub fn new(center: Point3, radius: f64) -> Self { Self { center_point: center, radius_value: radius } }
+    pub fn center(&self) -> Point3 { self.center_point }
+    pub fn radius(&self) -> f64 { self.radius_value }
+    pub fn validate(&self) -> Result<(), SurfaceError> {
+        if !self.center_point.x.is_finite() || !self.center_point.y.is_finite() || !self.center_point.z.is_finite() || !self.radius_value.is_finite() { return Err(SurfaceError::NonFinite); }
+        if self.radius_value <= 0.0 { return Err(SurfaceError::InvalidRadius); }
+        if !self.area().is_finite() { return Err(SurfaceError::NonFinite); }
+        let r = self.radius_value;
+        let values = [self.center_point.x - r, self.center_point.x + r, self.center_point.y - r, self.center_point.y + r, self.center_point.z - r, self.center_point.z + r];
+        if values.iter().any(|value| !value.is_finite()) { return Err(SurfaceError::NonFinite); }
+        Ok(())
+    }
+    pub fn area(&self) -> f64 { 4.0 * PI * self.radius_value * self.radius_value }
+    pub fn point_at(&self, u: f64, v: f64) -> Result<Point3, SurfaceError> {
+        self.validate()?;
+        if !u.is_finite() || !v.is_finite() || !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) { return Err(SurfaceError::OutOfDomain); }
+        let polar = PI * u; let azimuth = 2.0 * PI * v; let s = polar.sin();
+        let result = Point3 { x: self.center_point.x + self.radius_value * s * azimuth.cos(), y: self.center_point.y + self.radius_value * s * azimuth.sin(), z: self.center_point.z + self.radius_value * polar.cos() };
+        if !result.x.is_finite() || !result.y.is_finite() || !result.z.is_finite() { return Err(SurfaceError::NonFinite); }
+        Ok(result)
+    }
+    pub fn normal_at(&self, u: f64, v: f64) -> Result<Point3, SurfaceError> {
+        let radial = self.center_point.vector_to(self.point_at(u, v)?); let n = radial.norm();
+        if !n.is_finite() || n <= 0.0 { return Err(SurfaceError::NonFinite); }
+        Ok(Point3 { x: radial.x / n, y: radial.y / n, z: radial.z / n })
+    }
+    pub fn bounding_box(&self) -> Result<BoundingBox3, SurfaceError> {
+        self.validate()?; let r = self.radius_value;
+        Ok(BoundingBox3 { min: Point3 { x: self.center_point.x - r, y: self.center_point.y - r, z: self.center_point.z - r }, max: Point3 { x: self.center_point.x + r, y: self.center_point.y + r, z: self.center_point.z + r } })
+    }
+    pub fn distance_to_point(&self, point: Point3) -> Result<f64, SurfaceError> {
+        self.validate()?;
+        if !point.x.is_finite() || !point.y.is_finite() || !point.z.is_finite() { return Err(SurfaceError::NonFinite); }
+        let d = self.center_point.distance(point); if !d.is_finite() { return Err(SurfaceError::NonFinite); }
+        Ok((d - self.radius_value).abs())
+    }
+    pub fn translated(&self, dx: f64, dy: f64, dz: f64) -> Result<Self, SurfaceError> {
+        self.validate()?;
+        if !dx.is_finite() || !dy.is_finite() || !dz.is_finite() { return Err(SurfaceError::NonFinite); }
+        let center = Point3 { x: self.center_point.x + dx, y: self.center_point.y + dy, z: self.center_point.z + dz };
+        if !center.x.is_finite() || !center.y.is_finite() || !center.z.is_finite() { return Err(SurfaceError::NonFinite); }
+        Ok(Self { center_point: center, radius_value: self.radius_value })
     }
 }
