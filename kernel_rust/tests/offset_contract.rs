@@ -99,8 +99,8 @@ fn line_offset_rejects_degenerate_nonfinite_and_overflow_inputs() {
     assert_eq!(
         offset_line(
             line(
+                Point { x: -f64::MAX * 0.75, y: 0.0 },
                 Point { x: f64::MAX * 0.75, y: 0.0 },
-                Point { x: f64::MAX * 0.75 + 1.0, y: 0.0 },
             ),
             f64::MAX * 0.5,
         ),
