@@ -168,6 +168,20 @@ fn self_loop_contributes_two_to_topology_degree() {
 }
 
 #[test]
+fn line_to_circumference_distance_is_nonzero_for_segment_inside_circle() {
+    let line = Geometry::Line(Line {
+        start: Point { x: -1.0, y: 0.0 },
+        end: Point { x: 1.0, y: 0.0 },
+    });
+    let circle = Geometry::Circle(Circle {
+        center: Point { x: 0.0, y: 0.0 },
+        radius: 5.0,
+    });
+    assert!((point_distance(&line, &circle) - 4.0).abs() <= 1.0e-12);
+    assert!((point_distance(&circle, &line) - 4.0).abs() <= 1.0e-12);
+}
+
+#[test]
 fn zero_damping_uses_pseudoinverse_for_underdetermined_system() {
     let report = scaled_damped_qr(&[vec![1.0, 0.0]], &[1.0], 0.0, 1.0e-10).unwrap();
     assert_eq!(report.rank, 1);
