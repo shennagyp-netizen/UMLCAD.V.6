@@ -8,6 +8,7 @@ build = "build.rs"
 [dependencies]
 umlcad-v6-geometry-api = { path = "../geometry-api" }
 umlcad-v6-freeform-api = { path = "../freeform-api" }
+umlcad-v6-mesh-api = { path = "../mesh-api" }
 
 [build-dependencies]
 cmake = "0.1"
