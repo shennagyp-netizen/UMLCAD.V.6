@@ -7,9 +7,6 @@ use umlcad_v6_geometry_api::{GeometryBackend, GeometryEvidence, GeometryKind, Ge
 
 use super::{NativeShape, OcctBackend, OcctShape, OCCT_CONSTRUCTION_FAILED, OCCT_INTERNAL_ERROR, OCCT_INVALID_ARGUMENT, OCCT_NULL_SHAPE, OCCT_OK};
 
-#[path = "nurbs_surface.rs"]
-mod nurbs_surface;
-
 unsafe extern "C" {
     fn umlcad_occt_shape_export_file(input: *const NativeShape, format: i32, path: *const std::ffi::c_char) -> i32;
     fn umlcad_occt_shape_import_file(format: i32, path: *const std::ffi::c_char, out_shape: *mut *mut NativeShape) -> i32;
