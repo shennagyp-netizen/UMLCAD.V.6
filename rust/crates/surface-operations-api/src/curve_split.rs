@@ -1,7 +1,4 @@
-use crate::{
-    intersect_line_segment_nurbs_surface, IntersectionStatus, LineSegment3D,
-    LineSurfaceIntersectionError,
-};
+use crate::{IntersectionStatus, LineSegment3D, LineSurfaceIntersectionError};
 use umlcad_v6_nurbs_surface_api::Point3;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -71,6 +68,7 @@ pub fn split_line_segment_at_intersections(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::intersect_line_segment_nurbs_surface;
 
     fn plane() -> umlcad_v6_nurbs_surface_api::NurbsSurface3DDefinition {
         umlcad_v6_nurbs_surface_api::NurbsSurface3DDefinition::new(
