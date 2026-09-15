@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::path::Path;
 
 use umlcad_v6_exchange_api::{ExchangeBackend, ExchangeDirection, ExchangeError, ExchangeEvidence, ExchangeFormat, ExchangeStatus};
-use umlcad_v6_geometry_api::{GeometryEvidence, GeometryKind, GeometryResult, GeometryStatus, ToleranceContext};
+use umlcad_v6_geometry_api::{GeometryBackend, GeometryEvidence, GeometryKind, GeometryResult, GeometryStatus, ToleranceContext};
 
 use super::{NativeShape, OcctBackend, OcctShape, OCCT_CONSTRUCTION_FAILED, OCCT_INTERNAL_ERROR, OCCT_INVALID_ARGUMENT, OCCT_NULL_SHAPE, OCCT_OK};
 
@@ -32,6 +32,24 @@ fn exchange_status(status: i32) -> ExchangeError {
         OCCT_NULL_SHAPE => ExchangeError::EmptyResult,
         OCCT_CONSTRUCTION_FAILED | OCCT_INTERNAL_ERROR => ExchangeError::TranslationFailure,
         _ => ExchangeError::TranslationFailure,
+    }
+}
+
+fn imported_kind<S: Clone>(backend: &OcctBackend, shape: &S, tolerance: ToleranceContext) -> Result<GeometryKind, ExchangeError>
+where
+    OcctBackend: GeometryBackend<Shape = S>,
+{
+    let counts = backend
+        .topology_counts(shape, tolerance)
+        .map_err(|_| ExchangeError::TranslationFailure)?;
+    if counts.solids > 0 {
+        Ok(GeometryKind::Solid)
+    } else if counts.faces > 0 {
+        Ok(GeometryKind::Surface)
+    } else if counts.edges > 0 || counts.vertices > 0 {
+        Ok(GeometryKind::Curve)
+    } else {
+        Err(ExchangeError::EmptyResult)
     }
 }
 
@@ -93,9 +111,16 @@ impl ExchangeBackend for OcctBackend {
         }
         let raw = std::ptr::NonNull::new(raw).ok_or(ExchangeError::EmptyResult)?;
         let shape = OcctShape::from_raw(raw, GeometryKind::Solid);
+        let validation = self
+            .validate(&shape, tolerance)
+            .map_err(|_| ExchangeError::TranslationFailure)?;
+        if !validation.valid {
+            return Err(ExchangeError::TranslationFailure);
+        }
+        let kind = imported_kind(self, &shape, tolerance)?;
         Ok(GeometryResult {
             shape,
-            kind: GeometryKind::Solid,
+            kind,
             evidence: GeometryEvidence {
                 status: GeometryStatus::Success,
                 backend: self.backend_name(),
@@ -109,12 +134,18 @@ impl ExchangeBackend for OcctBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
     use umlcad_v6_geometry_api::GeometryBackend;
 
     const TOLERANCE: ToleranceContext = ToleranceContext {
         modeling: 1e-9,
         validation: 1e-9,
     };
+
+    fn temp_path(extension: &str) -> std::path::PathBuf {
+        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        std::env::temp_dir().join(format!("umlcad_v6_exchange_{}_{}.{}", std::process::id(), stamp, extension))
+    }
 
     #[test]
     fn unsupported_extension_is_rejected_before_backend_io() {
@@ -128,12 +159,38 @@ mod tests {
     fn exchange_path_with_embedded_nul_is_rejected() {
         let backend = OcctBackend::new();
         let shape = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
-        let error = backend.export_file(
-            &shape,
-            ExchangeFormat::Step,
-            Path::new("bad\0.step"),
-            TOLERANCE,
-        );
+        let error = backend.export_file(&shape, ExchangeFormat::Step, Path::new("bad\0.step"), TOLERANCE);
         assert_eq!(error, Err(ExchangeError::InvalidPath));
+    }
+
+    #[test]
+    fn step_round_trip_preserves_valid_geometry_and_kind() {
+        let backend = OcctBackend::new();
+        let source = backend.box_solid(10.0, 20.0, 30.0, TOLERANCE).unwrap().shape;
+        let path = temp_path("step");
+        let evidence = backend.export_file(&source, ExchangeFormat::Step, &path, TOLERANCE).unwrap();
+        assert_eq!(evidence.status, ExchangeStatus::Success);
+        assert!(evidence.bytes > 0);
+
+        let imported = backend.import_file(ExchangeFormat::Step, &path, TOLERANCE).unwrap();
+        assert_eq!(imported.kind, GeometryKind::Solid);
+        assert!(backend.validate(&imported.shape, TOLERANCE).unwrap().valid);
+        assert_eq!(backend.topology_counts(&source, TOLERANCE).unwrap(), backend.topology_counts(&imported.shape, TOLERANCE).unwrap());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn iges_round_trip_produces_valid_geometry() {
+        let backend = OcctBackend::new();
+        let source = backend.box_solid(5.0, 6.0, 7.0, TOLERANCE).unwrap().shape;
+        let path = temp_path("iges");
+        let evidence = backend.export_file(&source, ExchangeFormat::Iges, &path, TOLERANCE).unwrap();
+        assert_eq!(evidence.status, ExchangeStatus::Success);
+        assert!(evidence.bytes > 0);
+
+        let imported = backend.import_file(ExchangeFormat::Iges, &path, TOLERANCE).unwrap();
+        assert!(backend.validate(&imported.shape, TOLERANCE).unwrap().valid);
+        assert!(backend.topology_counts(&imported.shape, TOLERANCE).unwrap().faces > 0);
+        std::fs::remove_file(path).unwrap();
     }
 }
