@@ -6,4 +6,5 @@ license = "MIT"
 
 [dependencies]
 umlcad-v6-geometry-api = { path = "../geometry-api" }
+umlcad-v6-freeform-api = { path = "../freeform-api" }
 umlcad-v6-nurbs-surface-api = { path = "../nurbs-surface-api" }
