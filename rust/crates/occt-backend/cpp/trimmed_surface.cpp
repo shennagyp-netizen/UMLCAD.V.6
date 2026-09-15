@@ -13,10 +13,13 @@
 #include <TopoDS_Wire.hxx>
 #include <gp_Dir2d.hxx>
 #include <gp_Pnt2d.hxx>
+#include <TopoDS_Shape.hxx>
 
 #include <cmath>
 #include <cstdint>
 #include <vector>
+
+struct umlcad_occt_shape { TopoDS_Shape value; };
 
 namespace {
 
@@ -119,7 +122,7 @@ TopoDS_Wire buildWire(const double* uv, uint32_t point_count, const Handle(Geom_
         const double length = std::hypot(du, dv);
         if (!(length > 0.0) || !finite(length)) return TopoDS_Wire();
         const Handle(Geom2d_Line) line = new Geom2d_Line(p0, gp_Dir2d(du, dv));
-        const BRepBuilderAPI_MakeEdge edge_builder(line, surface, 0.0, length);
+        BRepBuilderAPI_MakeEdge edge_builder(line, surface, 0.0, length);
         if (!edge_builder.IsDone()) return TopoDS_Wire();
         wire_builder.Add(edge_builder.Edge());
         if (!wire_builder.IsDone()) return TopoDS_Wire();
