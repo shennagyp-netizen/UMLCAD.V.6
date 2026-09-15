@@ -1,10 +1,15 @@
 use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceEvaluationError, Point3};
 
 mod curve_split;
+mod curve_surface;
 mod planar_line_surface;
 mod point_surface;
 mod surface_surface;
 pub use curve_split::{split_line_segment_at_intersections, SplitLineSegmentError, SplitLineSegmentResult};
+pub use curve_surface::{
+    intersect_nurbs_curve_surface, CurveSurfaceIntersectionError, CurveSurfaceIntersectionPoint,
+    CurveSurfaceIntersectionResult, NurbsCurveSurfaceOperations,
+};
 pub use point_surface::{
     closest_point_on_planar_nurbs_surface, PointSurfaceClosestPoint,
     PointSurfaceClosestPointError, PointSurfaceClosestPointResult, PointSurfaceOperations,
