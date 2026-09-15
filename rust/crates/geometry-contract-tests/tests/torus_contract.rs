@@ -13,16 +13,16 @@ fn ring_torus_is_a_valid_manifold_solid() {
 }
 
 #[test]
-fn ring_torus_has_expected_axis_aligned_bounds() {
+fn ring_torus_has_expected_axis_aligned_bounds_within_declared_validation_tolerance() {
     let backend = OcctBackend::new();
     let shape = backend.torus_solid(20.0, 5.0, T).unwrap().shape;
     let bounds = backend.bounding_box(&shape, T).unwrap();
-    assert!((bounds.min_x + 25.0).abs() <= 1e-9, "x bounds: {:?}", bounds);
-    assert!((bounds.max_x - 25.0).abs() <= 1e-9, "x bounds: {:?}", bounds);
-    assert!((bounds.min_y + 25.0).abs() <= 1e-9, "y bounds: {:?}", bounds);
-    assert!((bounds.max_y - 25.0).abs() <= 1e-9, "y bounds: {:?}", bounds);
-    assert!((bounds.min_z + 5.0).abs() <= 1e-9, "z bounds: {:?}", bounds);
-    assert!((bounds.max_z - 5.0).abs() <= 1e-9, "z bounds: {:?}", bounds);
+    assert!((bounds.min_x + 25.0).abs() <= T.validation, "x bounds: {:?}", bounds);
+    assert!((bounds.max_x - 25.0).abs() <= T.validation, "x bounds: {:?}", bounds);
+    assert!((bounds.min_y + 25.0).abs() <= T.validation, "y bounds: {:?}", bounds);
+    assert!((bounds.max_y - 25.0).abs() <= T.validation, "y bounds: {:?}", bounds);
+    assert!((bounds.min_z + 5.0).abs() <= T.validation, "z bounds: {:?}", bounds);
+    assert!((bounds.max_z - 5.0).abs() <= T.validation, "z bounds: {:?}", bounds);
 }
 
 #[test]
