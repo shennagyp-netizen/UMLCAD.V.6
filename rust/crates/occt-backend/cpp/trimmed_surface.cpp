@@ -130,7 +130,7 @@ TopoDS_Wire buildWire(const double* uv, uint32_t point_count, const Handle(Geom_
     }
     TopoDS_Wire wire = wire_builder.Wire();
     if (wire.IsNull()) return TopoDS_Wire();
-    if (BRepLib::BuildCurves3d(wire) != 0) return TopoDS_Wire();
+    if (!BRepLib::BuildCurves3d(wire)) return TopoDS_Wire();
     return wire;
 }
 
