@@ -2,6 +2,8 @@
 mod curve_surface_operations;
 #[path = "surface_surface_operations.rs"]
 mod surface_surface_operations;
+#[path = "point_surface_operations.rs"]
+mod point_surface_operations;
 
 use std::ptr::NonNull;
 use super::super::{NativeShape, OcctBackend, OcctShape, OCCT_OK};
