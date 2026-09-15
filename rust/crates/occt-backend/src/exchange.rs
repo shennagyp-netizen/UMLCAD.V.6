@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::path::Path;
 
 use umlcad_v6_exchange_api::{ExchangeBackend, ExchangeDirection, ExchangeError, ExchangeEvidence, ExchangeFormat, ExchangeStatus};
-use umlcad_v6_geometry_api::{GeometryEvidence, GeometryError, GeometryKind, GeometryResult, GeometryStatus, ToleranceContext};
+use umlcad_v6_geometry_api::{GeometryEvidence, GeometryKind, GeometryResult, GeometryStatus, ToleranceContext};
 
 use super::{NativeShape, OcctBackend, OcctShape, OCCT_CONSTRUCTION_FAILED, OCCT_INTERNAL_ERROR, OCCT_INVALID_ARGUMENT, OCCT_NULL_SHAPE, OCCT_OK};
 
@@ -46,13 +46,14 @@ impl ExchangeBackend for OcctBackend {
         tolerance
             .validate()
             .map_err(|_| ExchangeError::InvalidPath)?;
-        let path = path_cstring(path)?;
-        let status = unsafe { umlcad_occt_shape_export_file(shape.raw.as_ptr(), format_code(format), path.as_ptr()) };
+        let destination = path_cstring(path)?;
+        let status = unsafe {
+            umlcad_occt_shape_export_file(shape.raw.as_ptr(), format_code(format), destination.as_ptr())
+        };
         if status != OCCT_OK {
             return Err(exchange_status(status));
         }
-        let metadata = std::fs::metadata(path.to_str().ok_or(ExchangeError::InvalidPath)?)
-            .map_err(|_| ExchangeError::IoFailure)?;
+        let metadata = std::fs::metadata(path).map_err(|_| ExchangeError::IoFailure)?;
         if !metadata.is_file() {
             return Err(ExchangeError::IoFailure);
         }
@@ -82,9 +83,11 @@ impl ExchangeBackend for OcctBackend {
         if !metadata.is_file() || metadata.len() == 0 {
             return Err(ExchangeError::EmptyResult);
         }
-        let path = path_cstring(path)?;
+        let source = path_cstring(path)?;
         let mut raw = std::ptr::null_mut();
-        let status = unsafe { umlcad_occt_shape_import_file(format_code(format), path.as_ptr(), &mut raw) };
+        let status = unsafe {
+            umlcad_occt_shape_import_file(format_code(format), source.as_ptr(), &mut raw)
+        };
         if status != OCCT_OK {
             return Err(exchange_status(status));
         }
@@ -115,14 +118,22 @@ mod tests {
 
     #[test]
     fn unsupported_extension_is_rejected_before_backend_io() {
-        assert_eq!(ExchangeFormat::from_extension(Path::new("part.obj")), Err(ExchangeError::UnsupportedFormat));
+        assert_eq!(
+            ExchangeFormat::from_extension(Path::new("part.obj")),
+            Err(ExchangeError::UnsupportedFormat)
+        );
     }
 
     #[test]
     fn exchange_path_with_embedded_nul_is_rejected() {
         let backend = OcctBackend::new();
         let shape = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
-        let error = backend.export_file(&shape, ExchangeFormat::Step, Path::new("bad\0.step"), TOLERANCE);
+        let error = backend.export_file(
+            &shape,
+            ExchangeFormat::Step,
+            Path::new("bad\0.step"),
+            TOLERANCE,
+        );
         assert_eq!(error, Err(ExchangeError::InvalidPath));
     }
 }
