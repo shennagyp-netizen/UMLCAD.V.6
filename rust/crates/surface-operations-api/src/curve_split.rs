@@ -91,8 +91,8 @@ mod tests {
     #[test]
     fn unique_interior_cut_is_deterministic() {
         let line = LineSegment3D {
-            start: Point3 { x: 0.0, y: 0.0, z: -1.0 },
-            end: Point3 { x: 0.0, y: 0.0, z: 1.0 },
+            start: Point3 { x: 0.5, y: 0.5, z: -1.0 },
+            end: Point3 { x: 0.5, y: 0.5, z: 1.0 },
         };
         let intersection = intersect_line_segment_nurbs_surface(line, &plane(), 1e-10).unwrap();
         assert_eq!(intersection.status, IntersectionStatus::Unique);
