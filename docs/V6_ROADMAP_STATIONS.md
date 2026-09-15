@@ -4,9 +4,9 @@ This document is the live station map for the V6 geometry-kernel program. The ma
 
 ## Current station
 
-**S11 — Freeform face construction and trimming — CURRENT**
+**S12 — Surface-surface / curve-surface operations — CURRENT**
 
-S8, S9, and S10 are complete. The NURBS surface mathematical authority, native OCCT realization, and native-versus-mathematical differential conformance gate are now established.
+S8, S9, S10, and S11 are complete. The NURBS surface mathematical authority, native realization, differential conformance, and trimmed-face B-Rep boundary layer are now established.
 
 ## Completed stations
 
@@ -55,30 +55,44 @@ Completed work:
 
 **S10 exit condition:** satisfied by the fully green authoritative CI matrix on PR #42. Merge commit: `ae5b0236cda3a792f27b63883835190e3c149f90`.
 
+### S11 — Freeform face construction and trimming — COMPLETE
+
+Promote validated NURBS surfaces into B-Rep faces with explicit trimming wires/edges. Establish orientation, parameter-space trimming, closure, and native face validity without exposing OCCT topology through the semantic API.
+
+Completed work:
+
+1. backend-neutral trimmed NURBS surface definition independent of OCCT topology types;
+2. explicit outer and inner UV trimming-loop semantics;
+3. semantic validation of finite coordinates, domain containment, loop closure, orientation, simplicity, hole containment, and loop intersections;
+4. native OCCT construction using NURBS-surface p-curves;
+5. native 3D boundary-curve completion using `BRepLib::BuildCurves3d`;
+6. opaque native B-Rep face boundary;
+7. deterministic tests for valid rectangular trims, holes, topology, planar area, and fail-closed invalid/self-intersecting inputs;
+8. correct separation between surface validity and the repository's solid-only manifold indicator;
+9. full authoritative debug/release, format, Clippy, kernel tests, and kernel Clippy gates passed on PR #43.
+
+**S11 exit condition:** satisfied by the fully green authoritative CI matrix on PR #43. Merge commit: `1c1d00af46cf5bad8ba4ef71648efe97852585b8`.
+
 ## Current station
-
-### S11 — Freeform face construction and trimming
-
-Promote validated NURBS surfaces into B-Rep faces with explicit trimming wires/edges. Establish orientation, parameter-space versus 3D curve consistency, closure, seam handling, and manifold validation. No guessed topology identity.
-
-Required work:
-
-1. define a backend-neutral trimmed-face contract independent of OCCT topology types;
-2. define explicit outer and inner trimming-loop semantics in surface parameter space;
-3. construct and validate 3D boundary curves from semantic curves and surface restrictions;
-4. establish wire closure, edge orientation, face orientation, and seam rules;
-5. verify that trimming curves remain geometrically consistent with the underlying surface within declared validation tolerance;
-6. construct an opaque native B-Rep face only after semantic validation succeeds;
-7. add independent point-on-surface/curve and loop-closure checks plus adversarial self-intersection and degeneracy cases;
-8. preserve deterministic references/evidence and fail closed on unsupported topology.
-
-**S11 exit condition:** a semantic trimmed-face definition can be validated independently, realized by the OCCT backend, and proven to preserve boundary geometry, orientation, closure, and manifold validity without exposing OCCT topology through the semantic API.
-
-## Following stations
 
 ### S12 — Surface-surface / curve-surface operations
 
-Add intersection, projection, closest-point, split/trim, and continuity-sensitive operations needed by real feature construction. Every operation gets independent numerical or geometric oracles.
+Establish the geometric operations required to derive and modify freeform boundaries from existing curves and surfaces while preserving mathematical authority and deterministic semantics.
+
+Required work:
+
+1. define backend-neutral curve/surface and surface/surface intersection contracts;
+2. define projection, closest-point, and distance contracts with explicit convergence/failure semantics;
+3. support curve splitting and surface trimming driven by computed intersections, not renderer approximations;
+4. distinguish isolated roots, tangent contact, coincident geometry, and overlapping/underdetermined intersections;
+5. establish numerical tolerances, parameter-domain behavior, and degeneracy handling before native implementation;
+6. provide independent geometric/numerical oracles for representative analytic and NURBS cases;
+7. realize supported operations through OCCT only after semantic validation, keeping native intersection algorithms behind opaque boundaries;
+8. preserve deterministic ordering/evidence and fail closed on ambiguous or unsupported solutions.
+
+**S12 exit condition:** representative curve-surface and surface-surface operations are independently defined, numerically validated, natively realized, deterministic, and proven not to silently convert ambiguous geometric relations into arbitrary topology.
+
+## Following stations
 
 ### S13 — Offsets and healing
 
