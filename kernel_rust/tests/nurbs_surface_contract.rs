@@ -10,10 +10,8 @@ fn bilinear_degree_one_surface_matches_independent_plane_oracle() {
         1,
         1,
         vec![
-            p(0.0, 0.0, 0.0),
-            p(0.0, 1.0, 1.0),
-            p(1.0, 0.0, 2.0),
-            p(1.0, 1.0, 3.0),
+            p(0.0, 0.0, 0.0), p(0.0, 1.0, 1.0),
+            p(1.0, 0.0, 2.0), p(1.0, 1.0, 3.0),
         ],
         vec![1.0, 1.0, 1.0, 1.0],
         vec![0.0, 0.0, 1.0, 1.0],
@@ -23,7 +21,7 @@ fn bilinear_degree_one_surface_matches_independent_plane_oracle() {
     let q = surface.point_at(0.25, 0.75).unwrap();
     assert!((q.x - 0.25).abs() < 1e-12);
     assert!((q.y - 0.75).abs() < 1e-12);
-    assert!((q.z - 1.75).abs() < 1e-12);
+    assert!((q.z - 1.25).abs() < 1e-12);
 }
 
 #[test]
@@ -32,10 +30,8 @@ fn rational_surface_weights_change_geometry_but_keep_parameter_domain() {
         1,
         1,
         vec![
-            p(0.0, 0.0, 0.0),
-            p(0.0, 1.0, 0.0),
-            p(1.0, 0.0, 0.0),
-            p(1.0, 1.0, 1.0),
+            p(0.0, 0.0, 0.0), p(0.0, 1.0, 0.0),
+            p(1.0, 0.0, 0.0), p(1.0, 1.0, 1.0),
         ],
         vec![1.0, 1.0, 1.0, 2.0],
         vec![0.0, 0.0, 1.0, 1.0],
@@ -44,9 +40,9 @@ fn rational_surface_weights_change_geometry_but_keep_parameter_domain() {
 
     assert_eq!(surface.parameter_domain().unwrap(), (0.0, 1.0, 0.0, 1.0));
     let q = surface.point_at(0.5, 0.5).unwrap();
-    assert!((q.x - 0.4).abs() < 1e-12);
-    assert!((q.y - 0.4).abs() < 1e-12);
-    assert!((q.z - 0.2).abs() < 1e-12);
+    assert!((q.x - 0.6).abs() < 1e-12);
+    assert!((q.y - 0.6).abs() < 1e-12);
+    assert!((q.z - 0.4).abs() < 1e-12);
 }
 
 #[test]
@@ -78,7 +74,10 @@ fn translation_is_immutable_and_commutes_with_surface_evaluation() {
     let surface = NurbsSurface2D::new(
         1,
         1,
-        vec![p(0.0, 0.0, 0.0), p(0.0, 1.0, 1.0), p(1.0, 0.0, 2.0), p(1.0, 1.0, 3.0)],
+        vec![
+            p(0.0, 0.0, 0.0), p(0.0, 1.0, 1.0),
+            p(1.0, 0.0, 2.0), p(1.0, 1.0, 3.0),
+        ],
         vec![1.0, 1.0, 1.0, 1.0],
         vec![0.0, 0.0, 1.0, 1.0],
         vec![0.0, 0.0, 1.0, 1.0],
