@@ -76,7 +76,7 @@ fn zero_distance_is_exact_identity_and_source_is_unchanged() {
 }
 
 #[test]
-fn line_offset_rejects_degenerate_nonfinite_and_overflow_inputs() {
+fn line_offset_rejects_exact_and_near_degenerate_geometry() {
     assert_eq!(
         offset_line(
             line(Point { x: 0.0, y: 0.0 }, Point { x: 0.0, y: 0.0 }),
@@ -84,6 +84,17 @@ fn line_offset_rejects_degenerate_nonfinite_and_overflow_inputs() {
         ),
         Err(OffsetError::Degenerate)
     );
+    assert_eq!(
+        offset_line(
+            line(Point { x: 0.0, y: 0.0 }, Point { x: 5e-10, y: 0.0 }),
+            1.0,
+        ),
+        Err(OffsetError::Degenerate)
+    );
+}
+
+#[test]
+fn line_offset_rejects_nonfinite_and_overflow_inputs() {
     assert_eq!(
         offset_line(
             line(Point { x: f64::NAN, y: 0.0 }, Point { x: 1.0, y: 0.0 }),

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::geometry::{Line, Point};
+use super::geometry::{Line, Point, EPSILON};
 
 #[derive(Error, Clone, Copy, Debug, PartialEq)]
 pub enum OffsetError {
@@ -28,7 +28,7 @@ pub fn offset_line(line: Line, distance: f64) -> Result<Line, OffsetError> {
     if !l.is_finite() {
         return Err(OffsetError::Overflow);
     }
-    if l == 0.0 {
+    if l <= EPSILON {
         return Err(OffsetError::Degenerate);
     }
     if distance == 0.0 {
