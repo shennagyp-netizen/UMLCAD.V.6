@@ -49,3 +49,29 @@ fn ring_torus_is_immutable_and_deterministic() {
     assert!(backend.validate(&source,T).unwrap().valid);
     assert!(backend.validate(&first,T).unwrap().valid);
 }
+
+#[test]
+fn ring_torus_periodic_topology_exposes_valid_geometric_descriptors() {
+    let backend = OcctBackend::new();
+    let shape = backend.torus_solid(20.0, 5.0, T).unwrap().shape;
+    let counts = backend.topology_counts(&shape, T).unwrap();
+    assert_eq!(counts.solids, 1);
+    assert_eq!(counts.shells, 1);
+    assert!(counts.faces >= 1);
+    assert!(counts.edges >= 1);
+
+    let faces = backend.face_descriptors(&shape, T).unwrap();
+    assert!(!faces.is_empty());
+    assert!(faces.iter().all(|face| face.area.is_finite() && face.area > 0.0 && face.boundary_edge_count >= 1));
+
+    let edges = backend.edge_descriptors(&shape, T).unwrap();
+    assert!(!edges.is_empty());
+    assert!(edges.iter().all(|edge| edge.length.is_finite() && edge.length >= 0.0 && edge.face_use_count >= 1 && edge.vertex_use_count >= 1));
+
+    let vertices = backend.vertex_descriptors(&shape, T).unwrap();
+    assert!(vertices.iter().all(|vertex| vertex.x.is_finite() && vertex.y.is_finite() && vertex.z.is_finite() && vertex.edge_use_count >= 1 && vertex.face_use_count >= 1));
+
+    assert_eq!(backend.face_descriptors(&shape, T).unwrap(), faces);
+    assert_eq!(backend.edge_descriptors(&shape, T).unwrap(), edges);
+    assert_eq!(backend.vertex_descriptors(&shape, T).unwrap(), vertices);
+}
