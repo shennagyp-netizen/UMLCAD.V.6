@@ -1,4 +1,4 @@
-#[path = "../curve_surface_operations.rs"]
+#[path = "curve_surface_operations.rs"]
 mod curve_surface_operations;
 
 use std::ptr::NonNull;
@@ -19,10 +19,7 @@ impl TrimmedNurbsSurfaceBackend for OcctBackend {
         for point in &definition.surface.control_points { poles_xyz.extend([point.x, point.y, point.z]); }
         let mut loop_uv = Vec::new();
         let mut loop_counts = Vec::with_capacity(definition.loops.len());
-        for loop_ in &definition.loops {
-            loop_counts.push(loop_.points.len() as u32);
-            for point in &loop_.points { loop_uv.extend([point.u, point.v]); }
-        }
+        for loop_ in &definition.loops { loop_counts.push(loop_.points.len() as u32); for point in &loop_.points { loop_uv.extend([point.u, point.v]); } }
         let mut raw = std::ptr::null_mut();
         let status = unsafe { umlcad_occt_trimmed_nurbs_surface3d(poles_xyz.as_ptr(), definition.surface.count_u as u32, definition.surface.count_v as u32, definition.surface.weights.as_ptr(), definition.surface.knots_u.as_ptr(), definition.surface.knots_u.len() as u32, definition.surface.knots_v.as_ptr(), definition.surface.knots_v.len() as u32, definition.surface.degree_u as u32, definition.surface.degree_v as u32, loop_uv.as_ptr(), loop_counts.as_ptr(), loop_counts.len() as u32, tolerance.modeling, &mut raw) };
         if status != OCCT_OK { return Err(Self::status(status, "OCCT trimmed NURBS face construction failed")); }
