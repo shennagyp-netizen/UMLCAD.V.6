@@ -1,7 +1,7 @@
 use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, Point3};
 use umlcad_v6_surface_operations_api::{
-    closest_point_on_planar_nurbs_surface, PointSurfaceClosestPointResult,
-    PointSurfaceClosestPointError, PointSurfaceOperations,
+    closest_point_on_planar_nurbs_surface, PointSurfaceClosestPointError,
+    PointSurfaceClosestPointResult, PointSurfaceOperations,
 };
 
 use crate::{OcctBackend, OCCT_OK};
@@ -83,9 +83,65 @@ impl PointSurfaceOperations for OcctBackend {
             .hypot(expected_point.surface_uv.1 - uv[1]);
         let distance_error = (expected_point.distance - native_distance).abs();
         let comparison_tol = tolerance.max(1e-9) * 20.0;
-        if point_error > comparison_tol || uv_error > comparison_tol || distance_error > comparison_tol {
+        if point_error > comparison_tol
+            || uv_error > comparison_tol
+            || distance_error > comparison_tol
+        {
             return Err(PointSurfaceClosestPointError::NumericalFailure);
         }
         Ok(expected)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unit_patch() -> NurbsSurface3DDefinition {
+        NurbsSurface3DDefinition::new(
+            (1, 1),
+            vec![
+                Point3 { x: 0.0, y: 0.0, z: 0.0 },
+                Point3 { x: 0.0, y: 1.0, z: 0.0 },
+                Point3 { x: 1.0, y: 0.0, z: 0.0 },
+                Point3 { x: 1.0, y: 1.0, z: 0.0 },
+            ],
+            vec![1.0; 4],
+            (2, 2),
+            vec![0.0, 0.0, 1.0, 1.0],
+            vec![0.0, 0.0, 1.0, 1.0],
+        )
+    }
+
+    #[test]
+    fn native_interior_projection_conforms() {
+        let backend = OcctBackend::new();
+        let result = backend
+            .closest_point_on_planar_nurbs_surface(
+                Point3 { x: 0.25, y: 0.75, z: 2.0 },
+                &unit_patch(),
+                1e-9,
+            )
+            .unwrap();
+        let closest = result.closest.unwrap();
+        assert!((closest.distance - 2.0).abs() < 1e-9);
+        assert!((closest.surface_uv.0 - 0.25).abs() < 1e-9);
+        assert!((closest.surface_uv.1 - 0.75).abs() < 1e-9);
+    }
+
+    #[test]
+    fn native_boundary_projection_conforms() {
+        let backend = OcctBackend::new();
+        let result = backend
+            .closest_point_on_planar_nurbs_surface(
+                Point3 { x: 2.0, y: 0.5, z: 0.0 },
+                &unit_patch(),
+                1e-9,
+            )
+            .unwrap();
+        let closest = result.closest.unwrap();
+        assert!((closest.point.x - 1.0).abs() < 1e-9);
+        assert!((closest.point.y - 0.5).abs() < 1e-9);
+        assert!((closest.distance - 1.0).abs() < 1e-9);
     }
 }
