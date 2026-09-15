@@ -1,4 +1,4 @@
-use umlcad_v6_freeform_api::{NurbsCurve3DDefinition, Point3 as CurvePoint3};
+use umlcad_v6_freeform_api::NurbsCurve3DDefinition;
 use umlcad_v6_nurbs_surface_api::NurbsSurface3DDefinition;
 use umlcad_v6_surface_operations_api::{
     intersect_line_segment_nurbs_surface, intersect_nurbs_curve_surface, CurveSurfaceOperations,
@@ -255,6 +255,7 @@ impl NurbsCurveSurfaceOperations for OcctBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use umlcad_v6_freeform_api::Point3 as CurvePoint3;
 
     fn plane() -> NurbsSurface3DDefinition {
         NurbsSurface3DDefinition::new(
