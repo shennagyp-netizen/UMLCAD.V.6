@@ -20,11 +20,34 @@ pub enum SweepError {
     OutOfDomain,
 }
 
+#[derive(Error, Clone, Copy, Debug, PartialEq)]
+pub enum SweepArcError {
+    #[error("sweep contains non-finite values")]
+    NonFinite,
+    #[error("path radius and profile radius must be positive")]
+    InvalidRadius,
+    #[error("circular path must be larger than its profile radius")]
+    InvalidGeometry,
+    #[error("angular span is invalid")]
+    InvalidSpan,
+    #[error("surface parameter is outside the unit domain")]
+    OutOfDomain,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CircularSweep {
     pub path_start: Point3,
     pub path_end: Point3,
     pub radius: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CircularArcSweep {
+    pub center: Point3,
+    pub path_radius: f64,
+    pub profile_radius: f64,
+    pub start_angle: f64,
+    pub end_angle: f64,
 }
 
 fn sub(a: Point3, b: Point3) -> Point3 {
@@ -79,35 +102,16 @@ impl CircularSweep {
 
     pub fn validate(&self) -> Result<(), SweepError> {
         let (axis, length) = self.axis_and_length()?;
-        let values = [
-            length,
-            self.volume(),
-            self.lateral_area(),
-            self.total_surface_area(),
-            axis.x,
-            axis.y,
-            axis.z,
-        ];
+        let values = [length, self.volume(), self.lateral_area(), self.total_surface_area(), axis.x, axis.y, axis.z];
         if values.iter().any(|v| !v.is_finite()) { return Err(SweepError::NonFinite); }
         self.bounding_box()?;
         Ok(())
     }
 
-    pub fn length(&self) -> f64 {
-        norm(sub(self.path_end, self.path_start))
-    }
-
-    pub fn volume(&self) -> f64 {
-        std::f64::consts::PI * self.radius * self.radius * self.length()
-    }
-
-    pub fn lateral_area(&self) -> f64 {
-        2.0 * std::f64::consts::PI * self.radius * self.length()
-    }
-
-    pub fn total_surface_area(&self) -> f64 {
-        2.0 * std::f64::consts::PI * self.radius * (self.length() + self.radius)
-    }
+    pub fn length(&self) -> f64 { norm(sub(self.path_end, self.path_start)) }
+    pub fn volume(&self) -> f64 { std::f64::consts::PI * self.radius * self.radius * self.length() }
+    pub fn lateral_area(&self) -> f64 { 2.0 * std::f64::consts::PI * self.radius * self.length() }
+    pub fn total_surface_area(&self) -> f64 { 2.0 * std::f64::consts::PI * self.radius * (self.length() + self.radius) }
 
     pub fn bounding_box(&self) -> Result<BoundingBox3, SweepError> {
         let (axis, _) = self.axis_and_length()?;
@@ -165,4 +169,117 @@ impl CircularSweep {
         if !finite_point(start) || !finite_point(end) { return Err(SweepError::NonFinite); }
         Ok(Self { path_start: start, path_end: end, radius: self.radius })
     }
+}
+
+impl CircularArcSweep {
+    pub fn new(center: Point3, path_radius: f64, profile_radius: f64, start_angle: f64, end_angle: f64) -> Self {
+        Self { center, path_radius, profile_radius, start_angle, end_angle }
+    }
+
+    fn span(&self) -> Result<f64, SweepArcError> {
+        let span = self.end_angle - self.start_angle;
+        if !span.is_finite() { return Err(SweepArcError::NonFinite); }
+        if span.abs() == 0.0 || span.abs() > std::f64::consts::TAU {
+            return Err(SweepArcError::InvalidSpan);
+        }
+        Ok(span)
+    }
+
+    pub fn validate(&self) -> Result<(), SweepArcError> {
+        if !finite_point(self.center) || !self.path_radius.is_finite() || !self.profile_radius.is_finite()
+            || !self.start_angle.is_finite() || !self.end_angle.is_finite()
+        {
+            return Err(SweepArcError::NonFinite);
+        }
+        if self.path_radius <= 0.0 || self.profile_radius <= 0.0 {
+            return Err(SweepArcError::InvalidRadius);
+        }
+        if self.profile_radius >= self.path_radius {
+            return Err(SweepArcError::InvalidGeometry);
+        }
+        let span = self.span()?;
+        let values = [self.path_length(), self.volume(), self.lateral_area(), self.total_surface_area(), span];
+        if values.iter().any(|v| !v.is_finite()) { return Err(SweepArcError::NonFinite); }
+        self.bounding_box()?;
+        Ok(())
+    }
+
+    pub fn path_length(&self) -> f64 { self.path_radius * (self.end_angle - self.start_angle).abs() }
+    pub fn volume(&self) -> f64 { std::f64::consts::PI * self.profile_radius * self.profile_radius * self.path_length() }
+    pub fn lateral_area(&self) -> f64 { 2.0 * std::f64::consts::PI * self.profile_radius * self.path_length() }
+    pub fn total_surface_area(&self) -> f64 {
+        2.0 * std::f64::consts::PI * self.profile_radius * (self.path_length() + self.profile_radius)
+    }
+
+    pub fn surface_point_at(&self, path_parameter: f64, profile_angle: f64) -> Result<Point3, SweepArcError> {
+        self.validate()?;
+        if !path_parameter.is_finite() || !profile_angle.is_finite() { return Err(SweepArcError::NonFinite); }
+        if !(0.0..=1.0).contains(&path_parameter) { return Err(SweepArcError::OutOfDomain); }
+        let theta = self.start_angle + (self.end_angle - self.start_angle) * path_parameter;
+        let radial = self.path_radius + self.profile_radius * profile_angle.cos();
+        let point = Point3 {
+            x: self.center.x + radial * theta.cos(),
+            y: self.center.y + radial * theta.sin(),
+            z: self.center.z + self.profile_radius * profile_angle.sin(),
+        };
+        if !finite_point(point) { return Err(SweepArcError::NonFinite); }
+        Ok(point)
+    }
+
+    pub fn bounding_box(&self) -> Result<BoundingBox3, SweepArcError> {
+        self.validate_without_box()?;
+        let span = self.end_angle - self.start_angle;
+        let mut angles = vec![self.start_angle, self.end_angle];
+        for candidate in [0.0, std::f64::consts::FRAC_PI_2, std::f64::consts::PI, 3.0 * std::f64::consts::FRAC_PI_2] {
+            if angle_on_sweep(self.start_angle, span, candidate) {
+                angles.push(candidate);
+            }
+        }
+
+        let mut min = Point3 { x: f64::INFINITY, y: f64::INFINITY, z: self.center.z - self.profile_radius };
+        let mut max = Point3 { x: f64::NEG_INFINITY, y: f64::NEG_INFINITY, z: self.center.z + self.profile_radius };
+        for theta in angles {
+            for radial in [self.path_radius - self.profile_radius, self.path_radius + self.profile_radius] {
+                let point = Point3 {
+                    x: self.center.x + radial * theta.cos(),
+                    y: self.center.y + radial * theta.sin(),
+                    z: self.center.z,
+                };
+                min.x = min.x.min(point.x);
+                min.y = min.y.min(point.y);
+                max.x = max.x.max(point.x);
+                max.y = max.y.max(point.y);
+            }
+        }
+        min.z = self.center.z - self.profile_radius;
+        max.z = self.center.z + self.profile_radius;
+        if !finite_point(min) || !finite_point(max) { return Err(SweepArcError::NonFinite); }
+        Ok(BoundingBox3 { min, max })
+    }
+
+    fn validate_without_box(&self) -> Result<(), SweepArcError> {
+        if !finite_point(self.center) || !self.path_radius.is_finite() || !self.profile_radius.is_finite()
+            || !self.start_angle.is_finite() || !self.end_angle.is_finite()
+        {
+            return Err(SweepArcError::NonFinite);
+        }
+        if self.path_radius <= 0.0 || self.profile_radius <= 0.0 { return Err(SweepArcError::InvalidRadius); }
+        if self.profile_radius >= self.path_radius { return Err(SweepArcError::InvalidGeometry); }
+        let _ = self.span()?;
+        Ok(())
+    }
+
+    pub fn translated(&self, dx: f64, dy: f64, dz: f64) -> Result<Self, SweepArcError> {
+        self.validate()?;
+        if !dx.is_finite() || !dy.is_finite() || !dz.is_finite() { return Err(SweepArcError::NonFinite); }
+        let center = Point3 { x: self.center.x + dx, y: self.center.y + dy, z: self.center.z + dz };
+        if !finite_point(center) { return Err(SweepArcError::NonFinite); }
+        Ok(Self { center, ..*self })
+    }
+}
+
+fn angle_on_sweep(start: f64, span: f64, angle: f64) -> bool {
+    let tau = std::f64::consts::TAU;
+    let delta = if span >= 0.0 { (angle - start).rem_euclid(tau) } else { (start - angle).rem_euclid(tau) };
+    delta <= span.abs() + 1.0e-12
 }
