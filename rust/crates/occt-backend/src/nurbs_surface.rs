@@ -1,3 +1,6 @@
+#[path = "trimmed_surface_backend.rs"]
+mod trimmed_surface_backend;
+
 use std::ptr::NonNull;
 
 use crate::{NativeShape, OcctBackend, OcctShape, OCCT_OK};

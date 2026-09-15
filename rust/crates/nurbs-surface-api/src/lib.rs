@@ -1,3 +1,7 @@
+mod trimmed_surface;
+
+pub use trimmed_surface::*;
+
 use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryResult, ToleranceContext};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
