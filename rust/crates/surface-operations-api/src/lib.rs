@@ -1,6 +1,11 @@
 use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceEvaluationError, Point3};
 
+mod point_surface;
 mod surface_surface;
+pub use point_surface::{
+    closest_point_on_planar_nurbs_surface, PointSurfaceClosestPoint,
+    PointSurfaceClosestPointError, PointSurfaceClosestPointResult, PointSurfaceOperations,
+};
 pub use surface_surface::{
     intersect_planar_nurbs_surfaces, SurfaceIntersectionEndpoint, SurfaceIntersectionSegment,
     SurfaceSurfaceIntersectionError, SurfaceSurfaceIntersectionResult, SurfaceSurfaceOperations,
@@ -254,26 +259,10 @@ mod tests {
         NurbsSurface3DDefinition::new(
             (1, 1),
             vec![
-                Point3 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                },
-                Point3 {
-                    x: 0.0,
-                    y: 1.0,
-                    z: 0.0,
-                },
-                Point3 {
-                    x: 1.0,
-                    y: 0.0,
-                    z: 0.0,
-                },
-                Point3 {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.0,
-                },
+                Point3 { x: 0.0, y: 0.0, z: 0.0 },
+                Point3 { x: 0.0, y: 1.0, z: 0.0 },
+                Point3 { x: 1.0, y: 0.0, z: 0.0 },
+                Point3 { x: 1.0, y: 1.0, z: 0.0 },
             ],
             vec![1.0; 4],
             (2, 2),
@@ -286,16 +275,8 @@ mod tests {
     fn line_plane_has_one_exact_intersection() {
         let r = intersect_line_segment_nurbs_surface(
             LineSegment3D {
-                start: Point3 {
-                    x: 0.25,
-                    y: 0.75,
-                    z: -1.0,
-                },
-                end: Point3 {
-                    x: 0.25,
-                    y: 0.75,
-                    z: 1.0,
-                },
+                start: Point3 { x: 0.25, y: 0.75, z: -1.0 },
+                end: Point3 { x: 0.25, y: 0.75, z: 1.0 },
             },
             &plane(),
             1e-10,
@@ -314,16 +295,8 @@ mod tests {
     fn parallel_line_has_no_intersection() {
         let r = intersect_line_segment_nurbs_surface(
             LineSegment3D {
-                start: Point3 {
-                    x: 0.25,
-                    y: 0.75,
-                    z: 1.0,
-                },
-                end: Point3 {
-                    x: 0.75,
-                    y: 0.75,
-                    z: 1.0,
-                },
+                start: Point3 { x: 0.25, y: 0.75, z: 1.0 },
+                end: Point3 { x: 0.75, y: 0.75, z: 1.0 },
             },
             &plane(),
             1e-10,
@@ -334,11 +307,7 @@ mod tests {
 
     #[test]
     fn degenerate_line_is_rejected() {
-        let p = Point3 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        };
+        let p = Point3 { x: 0.0, y: 0.0, z: 0.0 };
         assert_eq!(
             LineSegment3D { start: p, end: p }.validate(),
             Err(LineSurfaceIntersectionError::DegenerateLine)
