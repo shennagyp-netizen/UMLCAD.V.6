@@ -5,13 +5,14 @@
 #include <TColStd_Array1OfReal.hxx>
 #include <TColStd_Array2OfReal.hxx>
 #include <TColgp_Array2OfPnt.hxx>
+#include <TopoDS_Shape.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Lin.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Vec.hxx>
 
 #include <cmath>
 #include <cstdint>
-#include <new>
 #include <vector>
 
 struct umlcad_occt_shape { TopoDS_Shape value; };
@@ -47,8 +48,7 @@ bool valid(const double* p,uint32_t cu,uint32_t cv,const double* w,const double*
 }
 }
 
-extern "C" int32_t umlcad_occt_line_surface_intersection(
-    const double* poles_xyz,uint32_t count_u,uint32_t count_v,const double* weights,const double* knots_u,uint32_t knot_count_u,const double* knots_v,uint32_t knot_count_v,uint32_t degree_u,uint32_t degree_v,const double* start_xyz,const double* end_xyz,double tolerance,double* out_values,uint32_t capacity,uint32_t* out_count,int32_t* out_tangent){
+extern "C" int32_t umlcad_occt_line_surface_intersection(const double* poles_xyz,uint32_t count_u,uint32_t count_v,const double* weights,const double* knots_u,uint32_t knot_count_u,const double* knots_v,uint32_t knot_count_v,uint32_t degree_u,uint32_t degree_v,const double* start_xyz,const double* end_xyz,double tolerance,double* out_values,uint32_t capacity,uint32_t* out_count,int32_t* out_tangent){
     if(!out_values||!out_count||!out_tangent)return 1;*out_count=0;*out_tangent=0;
     if(!valid(poles_xyz,count_u,count_v,weights,knots_u,knot_count_u,knots_v,knot_count_v,degree_u,degree_v,start_xyz,end_xyz,tolerance))return 1;
     try{
