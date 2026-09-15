@@ -38,13 +38,19 @@ Numerical finite differences must not replace an available analytic derivative.
 
 ## NURBS representation
 
-The semantic NURBS curve is represented by control points, positive weights, degree, and a validated nondecreasing full knot vector. Evaluation is performed in projective homogeneous coordinates, followed by division by the accumulated weight.
+For a rational curve, the semantic model is
 
-For a homogeneous control point `H_i = (w_i P_i, w_i)`, the curve is evaluated with the same B-spline basis as the ordinary curve. The Euclidean point is recovered only after homogeneous evaluation.
+`C(u) = (Σ N_i,p(u) w_i P_i) / (Σ N_i,p(u) w_i)`.
 
-For first derivatives, the differentiated homogeneous control polygon is evaluated analytically and the Euclidean derivative is obtained with the quotient rule. This avoids finite-difference step-size dependence.
+The homogeneous control point is `H_i = (w_i P_i, w_i)`. UMLCAD evaluates the B-spline combination in homogeneous space and performs Euclidean dehomogenization only after the basis evaluation.
 
-The tensor-product surface implementation follows the same rule independently in U and V directions.
+The production evaluator uses the de Boor recurrence. Independent contract coverage also evaluates the normalized rational basis with the Cox–de Boor recursion. Agreement between these two formulations is therefore a mathematical regression signal independent of OCCT.
+
+For first derivatives, the differentiated homogeneous control polygon is evaluated analytically. If `H(u) = (X(u), W(u))`, then the Euclidean derivative is
+
+`C'(u) = (X'(u) W(u) - X(u) W'(u)) / W(u)^2`.
+
+The tensor-product surface implementation follows the same homogeneous rule independently in U and V directions, with normals obtained from the normalized cross product of the analytic partial derivatives.
 
 ## Backend independence
 
