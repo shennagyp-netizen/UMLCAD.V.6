@@ -32,6 +32,7 @@ pub struct BoundingBox2 {
 pub enum BSplineError {
     NonFinite,
     InvalidDegree,
+    DerivativeDegreeUnsupported,
     InvalidControlPointCount,
     InvalidKnotCount,
     KnotsMustBeNondecreasing,
@@ -133,7 +134,7 @@ impl BSplineCurve2D {
 
     /// Evaluate the first derivative for degree >= 2.
     ///
-    /// The derivative is itself represented as a clamped B-spline of degree p-1
+    /// The derivative is represented as a clamped B-spline of degree p-1
     /// using the standard differentiated control polygon and trimmed knot vector.
     /// Degree-one derivatives are intentionally unsupported because this kernel
     /// currently does not represent degree-zero B-splines as curves.
@@ -150,7 +151,7 @@ impl BSplineCurve2D {
             return Err(BSplineError::OutOfDomain);
         }
 
-        let p = self.degree as f64;
+        let degree = self.degree as f64;
         let mut derivative_points = Vec::with_capacity(self.control_points.len() - 1);
         for i in 0..self.control_points.len() - 1 {
             let denominator = self.knots[i + self.degree + 1] - self.knots[i + 1];
@@ -158,7 +159,7 @@ impl BSplineCurve2D {
             let point = if denominator == 0.0 {
                 Point2 { x: 0.0, y: 0.0 }
             } else {
-                numerator.scale(p / denominator)
+                numerator.scale(degree / denominator)
             };
             if !point.x.is_finite() || !point.y.is_finite() {
                 return Err(BSplineError::Overflow);
