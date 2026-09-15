@@ -14,12 +14,12 @@
 struct umlcad_occt_shape { TopoDS_Shape value; };
 
 namespace {
-bool finite(double value) { return std::isfinite(value); }
+bool is_finite_value(double value) { return std::isfinite(value); }
 }
 
 extern "C" int32_t umlcad_occt_nurbs_surface3d_differential(
     const umlcad_occt_shape* shape, double u, double v, double* out_values) {
-    if (shape == nullptr || out_values == nullptr || !finite(u) || !finite(v)) {
+    if (shape == nullptr || out_values == nullptr || !is_finite_value(u) || !is_finite_value(v)) {
         return UMLCAD_OCCT_INVALID_ARGUMENT;
     }
     try {
@@ -33,7 +33,8 @@ extern "C" int32_t umlcad_occt_nurbs_surface3d_differential(
 
         double u1 = 0.0, u2 = 0.0, v1 = 0.0, v2 = 0.0;
         surface->Bounds(u1, u2, v1, v2);
-        if (!finite(u1) || !finite(u2) || !finite(v1) || !finite(v2) || u < u1 || u > u2 || v < v1 || v > v2) {
+        if (!is_finite_value(u1) || !is_finite_value(u2) || !is_finite_value(v1) ||
+            !is_finite_value(v2) || u < u1 || u > u2 || v < v1 || v > v2) {
             return UMLCAD_OCCT_INVALID_ARGUMENT;
         }
 
@@ -56,7 +57,7 @@ extern "C" int32_t umlcad_occt_nurbs_surface3d_differential(
             dvv.X(), dvv.Y(), dvv.Z()
         };
         for (double value : values) {
-            if (!finite(value)) return UMLCAD_OCCT_INTERNAL_ERROR;
+            if (!is_finite_value(value)) return UMLCAD_OCCT_INTERNAL_ERROR;
         }
         for (int i = 0; i < 18; ++i) out_values[i] = values[i];
         return UMLCAD_OCCT_OK;
