@@ -16,6 +16,7 @@ add_library(umlcad_occt_bridge SHARED
     cpp/torus.cpp
     cpp/circle.cpp
     cpp/line.cpp
+    cpp/nurbs_curve.cpp
 )
 target_include_directories(umlcad_occt_bridge PRIVATE ${OpenCASCADE_INCLUDE_DIR})
 target_link_directories(umlcad_occt_bridge PRIVATE ${OpenCASCADE_LIBRARY_DIR})
