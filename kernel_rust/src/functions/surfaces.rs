@@ -104,8 +104,14 @@ impl SphereSurface {
     pub fn point_at(&self, u: f64, v: f64) -> Result<Point3, SurfaceError> {
         self.validate()?;
         if !u.is_finite() || !v.is_finite() || !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) { return Err(SurfaceError::OutOfDomain); }
-        let polar = PI * u; let azimuth = 2.0 * PI * v; let s = polar.sin();
-        let result = Point3 { x: self.center_point.x + self.radius_value * s * azimuth.cos(), y: self.center_point.y + self.radius_value * s * azimuth.sin(), z: self.center_point.z + self.radius_value * polar.cos() };
+        let azimuth = 2.0 * PI * u;
+        let polar = PI * v;
+        let sin_polar = polar.sin();
+        let result = Point3 {
+            x: self.center_point.x + self.radius_value * sin_polar * azimuth.sin(),
+            y: self.center_point.y + self.radius_value * sin_polar * azimuth.cos(),
+            z: self.center_point.z + self.radius_value * polar.cos(),
+        };
         if !result.x.is_finite() || !result.y.is_finite() || !result.z.is_finite() { return Err(SurfaceError::NonFinite); }
         Ok(result)
     }
