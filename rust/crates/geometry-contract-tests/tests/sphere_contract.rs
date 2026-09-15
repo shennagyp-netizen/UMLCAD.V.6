@@ -19,6 +19,17 @@ fn sphere_has_canonical_occt_topology() {
 }
 
 #[test]
+fn sphere_face_evidence_matches_analytic_surface_area() {
+    let backend = OcctBackend::new();
+    let shape = backend.sphere_solid(5.0, TOLERANCE).unwrap().shape;
+    let faces = backend.face_descriptors(&shape, TOLERANCE).unwrap();
+    assert_eq!(faces.len(), 1);
+    let expected = 4.0 * std::f64::consts::PI * 25.0;
+    assert!((faces[0].area - expected).abs() <= 1e-9, "expected sphere area {expected:.17e}, got {:.17e}", faces[0].area);
+    assert!(faces[0].boundary_edge_count >= 1);
+}
+
+#[test]
 fn sphere_rejects_invalid_radius() {
     let backend = OcctBackend::new();
     for radius in [0.0, -1.0, f64::NAN, f64::INFINITY] {
@@ -37,7 +48,6 @@ fn sphere_bounds_and_immutable_transforms_are_preserved() {
     let bounds = backend.bounding_box(&source, TOLERANCE).unwrap();
     assert_eq!((bounds.min_x, bounds.min_y, bounds.min_z), (-5.0, -5.0, -5.0));
     assert_eq!((bounds.max_x, bounds.max_y, bounds.max_z), (5.0, 5.0, 5.0));
-
     let translated = backend.translate(&source, 10.0, -20.0, 30.0, TOLERANCE).unwrap().shape;
     let rotated = backend.rotate(&source, 1.0, 2.0, 3.0, std::f64::consts::FRAC_PI_2, TOLERANCE).unwrap().shape;
     for shape in [&source, &translated, &rotated] {
