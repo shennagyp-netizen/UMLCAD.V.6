@@ -7,7 +7,12 @@ fn plane() -> NurbsSurface2D {
     NurbsSurface2D::new(
         1,
         1,
-        vec![p(0.0, 0.0, 0.0), p(0.0, 1.0, 1.0), p(1.0, 0.0, 2.0), p(1.0, 1.0, 3.0)],
+        vec![
+            p(0.0, 0.0, 0.0),
+            p(0.0, 1.0, 1.0),
+            p(1.0, 0.0, 2.0),
+            p(1.0, 1.0, 3.0),
+        ],
         vec![1.0; 4],
         vec![0.0, 0.0, 1.0, 1.0],
         vec![0.0, 0.0, 1.0, 1.0],
@@ -43,15 +48,9 @@ fn planar_normal_is_unit_and_deterministic() {
 fn translation_preserves_derivatives_and_normal() {
     let surface = plane();
     let moved = surface.translated(100.0, -50.0, 7.0).unwrap();
-    let original_u = surface.derivative_u_at(0.4, 0.6).unwrap();
-    let moved_u = moved.derivative_u_at(0.4, 0.6).unwrap();
-    let original_v = surface.derivative_v_at(0.4, 0.6).unwrap();
-    let moved_v = moved.derivative_v_at(0.4, 0.6).unwrap();
-    let original_normal = surface.normal_at(0.4, 0.6).unwrap();
-    let moved_normal = moved.normal_at(0.4, 0.6).unwrap();
-    assert_eq!(moved_u, original_u);
-    assert_eq!(moved_v, original_v);
-    assert_eq!(moved_normal, original_normal);
+    assert_eq!(moved.derivative_u_at(0.4, 0.6).unwrap(), surface.derivative_u_at(0.4, 0.6).unwrap());
+    assert_eq!(moved.derivative_v_at(0.4, 0.6).unwrap(), surface.derivative_v_at(0.4, 0.6).unwrap());
+    assert_eq!(moved.normal_at(0.4, 0.6).unwrap(), surface.normal_at(0.4, 0.6).unwrap());
 }
 
 #[test]
@@ -59,12 +58,17 @@ fn degenerate_surface_normal_is_rejected() {
     let surface = NurbsSurface2D::new(
         1,
         1,
-        vec![p(0.0, 0.0, 0.0), p(0.0, 1.0, 0.0), p(0.0, 0.0, 0.0), p(0.0, 1.0, 0.0)],
+        vec![
+            p(0.0, 0.0, 0.0),
+            p(0.0, 1.0, 0.0),
+            p(0.0, 0.0, 0.0),
+            p(0.0, 1.0, 0.0),
+        ],
         vec![1.0; 4],
         vec![0.0, 0.0, 1.0, 1.0],
         vec![0.0, 0.0, 1.0, 1.0],
     );
-    assert_eq!(surface.normal_at(0.5, 0.5), Err(NurbsSurfaceError::ZeroNormal));
+    assert_eq!(surface.normal_at(0.5, 0.5), Err(NurbsSurfaceError::Degenerate));
 }
 
 #[test]
