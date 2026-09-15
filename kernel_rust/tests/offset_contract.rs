@@ -39,7 +39,9 @@ fn offset_preserves_length_and_direction() {
     let source_direction = source.end.sub(source.start);
     let result_direction = result.end.sub(result.start);
     assert!((source.start.distance(source.end) - result.start.distance(result.end)).abs() < 1e-12);
-    assert!((source_direction.cross(result_direction)).abs() < 1e-12);
+    let cross = source_direction.x * result_direction.y
+        - source_direction.y * result_direction.x;
+    assert!(cross.abs() < 1e-12);
     assert!(result_direction.dot(source_direction) > 0.0);
 }
 
@@ -99,8 +101,8 @@ fn line_offset_rejects_degenerate_nonfinite_and_overflow_inputs() {
     assert_eq!(
         offset_line(
             line(
+                Point { x: -f64::MAX * 0.75, y: 0.0 },
                 Point { x: f64::MAX * 0.75, y: 0.0 },
-                Point { x: f64::MAX * 0.75 + 1.0, y: 0.0 },
             ),
             f64::MAX * 0.5,
         ),
