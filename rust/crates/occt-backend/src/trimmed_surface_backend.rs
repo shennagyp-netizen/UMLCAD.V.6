@@ -130,8 +130,9 @@ mod tests {
         let result = backend.trimmed_nurbs_surface3d(&definition, TOLERANCE).unwrap();
         assert_eq!(result.kind, GeometryKind::Surface);
         assert_eq!(backend.topology_counts(&result.shape, TOLERANCE).unwrap().faces, 1);
-        assert!(backend.validate(&result.shape, TOLERANCE).unwrap().valid);
-        assert!(!backend.validate(&result.shape, TOLERANCE).unwrap().manifold);
+        let validation = backend.validate(&result.shape, TOLERANCE).unwrap();
+        assert!(validation.valid);
+        assert!(!validation.manifold);
     }
 
     #[test]
