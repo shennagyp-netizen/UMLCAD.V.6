@@ -397,13 +397,8 @@ pub fn evaluate_relation(
             let d = distance(a, b).max(1.0);
             Ok(make(
                 r,
-                vec![
-                    (a.x + b.x) / 2.0 - o.x,
-                    (a.y + b.y) / 2.0 - o.y,
-                    a.x + b.x - 2.0 * o.x,
-                    a.y + b.y - 2.0 * o.y,
-                ],
-                vec![d, d, d, d],
+                vec![(a.x + b.x) / 2.0 - o.x, (a.y + b.y) / 2.0 - o.y],
+                vec![d, d],
             ))
         }
     }

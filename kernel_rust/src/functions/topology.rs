@@ -32,16 +32,16 @@ pub struct TopologyModel {
 fn endpoint(g: &Geometry, start: bool) -> Option<Point> {
     match g {
         Geometry::Line(l) => Some(if start { l.start } else { l.end }),
-        Geometry::Arc(a) => Some(if start {
-            a.start_point()
-        } else {
-            a.end_point()
-        }),
+        Geometry::Arc(a) => Some(if start { a.start_point() } else { a.end_point() }),
         Geometry::Circle(_) => None,
     }
 }
-fn near(a: Point, b: Point, t: f64) -> bool {
-    a.distance(b) <= t
+fn near(a: Point, b: Point, t: f64) -> bool { a.distance(b) <= t }
+
+fn incident_degree(edge: &TopologyEdge, vertex_id: &str) -> usize {
+    if edge.closed { return 0; }
+    usize::from(edge.start_vertex_id.as_deref() == Some(vertex_id))
+        + usize::from(edge.end_vertex_id.as_deref() == Some(vertex_id))
 }
 
 pub fn build_topology(snapshot: &SemanticSnapshot) -> Result<TopologyModel, String> {
@@ -56,10 +56,7 @@ pub fn build_topology(snapshot: &SemanticSnapshot) -> Result<TopologyModel, Stri
             return v.id.clone();
         }
         let id = format!("v{}", vertices.len() + 1);
-        vertices.push(TopologyVertex {
-            id: id.clone(),
-            point: p,
-        });
+        vertices.push(TopologyVertex { id: id.clone(), point: p });
         id
     };
 
@@ -79,19 +76,9 @@ pub fn build_topology(snapshot: &SemanticSnapshot) -> Result<TopologyModel, Stri
     }
 
     for v in &vertices {
-        let degree = edges
-            .iter()
-            .filter(|e| {
-                !e.closed
-                    && (e.start_vertex_id.as_ref() == Some(&v.id)
-                        || e.end_vertex_id.as_ref() == Some(&v.id))
-            })
-            .count();
+        let degree: usize = edges.iter().map(|e| incident_degree(e, &v.id)).sum();
         if degree > 2 {
-            return Err(format!(
-                "Non-manifold topology: vertex {} has degree {}",
-                v.id, degree
-            ));
+            return Err(format!("Non-manifold topology: vertex {} has degree {}", v.id, degree));
         }
     }
 
@@ -130,63 +117,38 @@ pub fn build_topology(snapshot: &SemanticSnapshot) -> Result<TopologyModel, Stri
         }
 
         let degree_of = |vertex_id: &str| -> usize {
-            edges
-                .iter()
-                .filter(|e| {
-                    !e.closed
-                        && (e.start_vertex_id.as_deref() == Some(vertex_id)
-                            || e.end_vertex_id.as_deref() == Some(vertex_id))
-                })
-                .count()
+            edges.iter().map(|e| incident_degree(e, vertex_id)).sum()
         };
         let sx = start.as_ref().unwrap();
         let ex = end.as_ref().unwrap();
         let origin = {
             let ds = degree_of(sx);
             let de = degree_of(ex);
-            if ds == 1 && de != 1 {
-                sx.clone()
-            } else if de == 1 && ds != 1 {
-                ex.clone()
-            } else {
-                sx.min(ex).clone()
-            }
+            if ds == 1 && de != 1 { sx.clone() }
+            else if de == 1 && ds != 1 { ex.clone() }
+            else { sx.min(ex).clone() }
         };
 
         left.remove(&seed_id);
         let forward = seed.start_vertex_id.as_deref() == Some(&origin);
-        let mut current = if forward {
-            seed.end_vertex_id.clone()
-        } else {
-            seed.start_vertex_id.clone()
-        };
+        let mut current = if forward { seed.end_vertex_id.clone() } else { seed.start_vertex_id.clone() };
         let mut edge_ids = vec![seed.id.clone()];
         let mut directions = vec![forward];
 
         while current.as_ref() != Some(&origin) {
-            let candidates: Vec<&TopologyEdge> = edges
-                .iter()
-                .filter(|e| {
-                    left.contains(&e.id)
-                        && !e.closed
-                        && (e.start_vertex_id == current || e.end_vertex_id == current)
-                })
-                .collect();
+            let candidates: Vec<&TopologyEdge> = edges.iter().filter(|e| {
+                left.contains(&e.id) && !e.closed
+                    && (e.start_vertex_id == current || e.end_vertex_id == current)
+            }).collect();
             if candidates.len() > 1 {
                 return Err(format!("Ambiguous topology at vertex {}", current.unwrap()));
             }
-            let Some(next) = candidates.first().copied() else {
-                break;
-            };
+            let Some(next) = candidates.first().copied() else { break; };
             left.remove(&next.id);
             let forward = next.start_vertex_id == current;
             edge_ids.push(next.id.clone());
             directions.push(forward);
-            current = if forward {
-                next.end_vertex_id.clone()
-            } else {
-                next.start_vertex_id.clone()
-            };
+            current = if forward { next.end_vertex_id.clone() } else { next.start_vertex_id.clone() };
         }
 
         wires.push(TopologyWire {
@@ -197,9 +159,5 @@ pub fn build_topology(snapshot: &SemanticSnapshot) -> Result<TopologyModel, Stri
         });
     }
 
-    Ok(TopologyModel {
-        vertices,
-        edges,
-        wires,
-    })
+    Ok(TopologyModel { vertices, edges, wires })
 }

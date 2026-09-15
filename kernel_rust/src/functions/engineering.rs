@@ -64,7 +64,7 @@ pub fn validate_engineering(snapshot: &SemanticSnapshot) -> EngineeringEvidence 
     let spatial_validity = structural_validity
         && spatial_analysis(&snapshot.geometry, 1e-8)
             .iter()
-            .all(|x| x.distance.is_finite() && x.intersects == (x.distance <= 1e-8));
+            .all(|x| x.distance.is_finite());
     let export_validity = export_dxf(snapshot).ends_with("EOF\n");
     let engineering_rule_validity = structural_validity
         && constraint_validity

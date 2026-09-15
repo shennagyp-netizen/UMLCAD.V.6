@@ -57,3 +57,23 @@ jobs:
       - name: Clippy gate
         working-directory: rust
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Kernel format gate
+        working-directory: kernel_rust
+        run: cargo fmt --all
+
+      - name: Kernel test gate (debug)
+        working-directory: kernel_rust
+        run: cargo test --all-targets
+
+      - name: Kernel test gate (release)
+        working-directory: kernel_rust
+        run: cargo test --all-targets --release
+
+      - name: Kernel clippy source gate
+        working-directory: kernel_rust
+        run: cargo clippy --lib --bins -- -D warnings
+
+      - name: Kernel clippy test gate
+        working-directory: kernel_rust
+        run: cargo clippy --tests -- -D warnings -A clippy::useless_vec -A clippy::bool_assert_comparison

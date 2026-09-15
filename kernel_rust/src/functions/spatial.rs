@@ -1,5 +1,7 @@
 use super::geometry::{aabb_intersects, Arc, Circle, Geometry, Line, Point, EPSILON};
 
+const PARAM_EPSILON: f64 = 1.0e-10;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct SpatialResult {
     pub first_geometry_id: String,
@@ -46,7 +48,9 @@ fn segment_distance(a: Line, b: Line) -> f64 {
     if den.abs() > EPSILON {
         let t = cross(r, e) / den;
         let u = cross(r, d) / den;
-        if (-EPSILON..=1.0 + EPSILON).contains(&t) && (-EPSILON..=1.0 + EPSILON).contains(&u) {
+        if (-PARAM_EPSILON..=1.0 + PARAM_EPSILON).contains(&t)
+            && (-PARAM_EPSILON..=1.0 + PARAM_EPSILON).contains(&u)
+        {
             return 0.0;
         }
     }
@@ -75,84 +79,211 @@ fn circle_circle(a: Circle, b: Circle) -> f64 {
 }
 
 fn line_circle(l: Line, c: Circle) -> f64 {
-    (c.center.distance(closest(l, c.center)) - c.radius).max(0.0)
-}
-
-fn arc_point(a: Arc, t: f64) -> Point {
-    Geometry::Arc(a).point_at(t)
-}
-
-fn arc_distance(a: Arc, p: Point) -> f64 {
-    Geometry::Arc(a).distance_to_point(p)
+    if !line_circle_intersections(l, c).is_empty() {
+        return 0.0;
+    }
+    let endpoint_best = [l.start, l.end]
+        .into_iter()
+        .map(|p| (c.center.distance(p) - c.radius).abs())
+        .fold(f64::INFINITY, f64::min);
+    let nearest_to_center = (c.center.distance(closest(l, c.center)) - c.radius).abs();
+    endpoint_best.min(nearest_to_center)
 }
 
 fn point_on_arc(a: Arc, p: Point) -> bool {
-    let ang = (p.y - a.center.y).atan2(p.x - a.center.x);
-    [-2.0 * std::f64::consts::PI, 0.0, 2.0 * std::f64::consts::PI]
-        .into_iter()
-        .any(|k| {
-            let t = (ang + k - a.start_angle) / (a.end_angle - a.start_angle);
-            (-EPSILON..=1.0 + EPSILON).contains(&t)
-        })
+    a.contains_point(p)
+}
+
+fn arc_point_distance(a: Arc, p: Point) -> f64 {
+    let radial = p.sub(a.center);
+    let radial_length = radial.norm();
+    if radial_length > EPSILON {
+        let projected = a.center.add(radial.scale(a.radius / radial_length));
+        if point_on_arc(a, projected) {
+            return (radial_length - a.radius).abs();
+        }
+    }
+    a.start_point()
+        .distance(p)
+        .min(a.end_point().distance(p))
+}
+
+fn push_unique(points: &mut Vec<Point>, p: Point) {
+    if !points
+        .iter()
+        .any(|q| q.distance(p) <= PARAM_EPSILON)
+    {
+        points.push(p);
+    }
+}
+
+fn line_circle_intersections(l: Line, c: Circle) -> Vec<Point> {
+    let d = l.end.sub(l.start);
+    let f = l.start.sub(c.center);
+    let aa = d.dot(d);
+    if aa <= EPSILON {
+        return Vec::new();
+    }
+    let bb = 2.0 * f.dot(d);
+    let cc = f.dot(f) - c.radius * c.radius;
+    let disc = bb * bb - 4.0 * aa * cc;
+    if disc < -PARAM_EPSILON {
+        return Vec::new();
+    }
+    if disc.abs() <= PARAM_EPSILON {
+        let t = -bb / (2.0 * aa);
+        if (-PARAM_EPSILON..=1.0 + PARAM_EPSILON).contains(&t) {
+            return vec![l.start.add(d.scale(t.clamp(0.0, 1.0)))];
+        }
+        return Vec::new();
+    }
+    let root = disc.max(0.0).sqrt();
+    let mut out = Vec::new();
+    for t in [(-bb - root) / (2.0 * aa), (-bb + root) / (2.0 * aa)] {
+        if (-PARAM_EPSILON..=1.0 + PARAM_EPSILON).contains(&t) {
+            push_unique(&mut out, l.start.add(d.scale(t.clamp(0.0, 1.0))));
+        }
+    }
+    out
+}
+
+fn circle_circle_intersections(a: Circle, b: Circle) -> Vec<Point> {
+    let delta = b.center.sub(a.center);
+    let d = delta.norm();
+    if d <= EPSILON
+        || d > a.radius + b.radius + PARAM_EPSILON
+        || d + PARAM_EPSILON < (a.radius - b.radius).abs()
+    {
+        return Vec::new();
+    }
+    let x = (a.radius * a.radius - b.radius * b.radius + d * d) / (2.0 * d);
+    let h2 = a.radius * a.radius - x * x;
+    if h2 < -PARAM_EPSILON {
+        return Vec::new();
+    }
+    let h = h2.max(0.0).sqrt();
+    let u = delta.scale(1.0 / d);
+    let base = a.center.add(u.scale(x));
+    let perp = Point { x: -u.y, y: u.x };
+    let mut out = Vec::new();
+    push_unique(&mut out, base.add(perp.scale(h)));
+    if h > PARAM_EPSILON {
+        push_unique(&mut out, base.sub(perp.scale(h)));
+    }
+    out
+}
+
+fn arc_extreme_candidates(a: Arc, toward: Point) -> Vec<Point> {
+    let v = toward.sub(a.center);
+    let n = v.norm();
+    if n <= EPSILON {
+        return Vec::new();
+    }
+    let q = a.center.add(v.scale(a.radius / n));
+    let q2 = a.center.sub(v.scale(a.radius / n));
+    let mut out = Vec::new();
+    if point_on_arc(a, q) {
+        push_unique(&mut out, q);
+    }
+    if point_on_arc(a, q2) {
+        push_unique(&mut out, q2);
+    }
+    out
 }
 
 fn line_arc(l: Line, a: Arc) -> f64 {
-    let circle_dist = line_circle(
-        l,
-        Circle {
-            center: a.center,
-            radius: a.radius,
-        },
-    );
-    if circle_dist <= EPSILON {
-        let q = closest(l, a.center);
-        if point_on_arc(a, q) {
+    let circle = Circle {
+        center: a.center,
+        radius: a.radius,
+    };
+    for p in line_circle_intersections(l, circle) {
+        if point_on_arc(a, p) {
             return 0.0;
         }
     }
-    let p0 = l.start.distance(arc_point(a, 0.0));
-    let p1 = l.end.distance(arc_point(a, 1.0));
-    let pa = arc_distance(a, l.start);
-    let pb = arc_distance(a, l.end);
-    circle_dist.min(p0.min(p1).min(pa.min(pb)))
+    let mut best = f64::INFINITY;
+    for p in [l.start, l.end] {
+        best = best.min(arc_point_distance(a, p));
+    }
+    for p in [a.start_point(), a.end_point()] {
+        best = best.min(l.start.distance(p).min(l.end.distance(p)));
+    }
+    let q = closest(l, a.center);
+    let radial = q.sub(a.center).norm();
+    if radial > EPSILON {
+        let p = a.center.add(q.sub(a.center).scale(a.radius / radial));
+        if point_on_arc(a, p) {
+            best = best.min(p.distance(q));
+        }
+    }
+    best
 }
 
 fn arc_circle(a: Arc, c: Circle) -> f64 {
-    let center_dist = arc_distance(a, c.center);
-    (center_dist - c.radius)
-        .abs()
-        .min((arc_point(a, 0.0).distance(c.center) - c.radius).abs())
-        .min((arc_point(a, 1.0).distance(c.center) - c.radius).abs())
-}
-
-fn arc_arc(a: Arc, b: Arc) -> f64 {
-    let circle_dist = circle_circle(
+    for p in circle_circle_intersections(
         Circle {
             center: a.center,
             radius: a.radius,
         },
-        Circle {
-            center: b.center,
-            radius: b.radius,
-        },
-    );
-    if circle_dist <= EPSILON {
-        for t in [0.0, 0.5, 1.0] {
-            if point_on_arc(b, arc_point(a, t)) {
-                return 0.0;
-            }
+        c,
+    ) {
+        if point_on_arc(a, p) {
+            return 0.0;
         }
     }
+    let mut best = f64::INFINITY;
+    for p in [a.start_point(), a.end_point()] {
+        best = best.min((p.distance(c.center) - c.radius).abs());
+    }
+    for p in arc_extreme_candidates(a, c.center) {
+        best = best.min((p.distance(c.center) - c.radius).abs());
+    }
+    if a.center.distance(c.center) <= EPSILON {
+        best.min((a.radius - c.radius).abs())
+    } else {
+        best
+    }
+}
 
-    let mut d = arc_point(a, 0.0)
-        .distance(arc_point(b, 0.0))
-        .min(arc_point(a, 0.0).distance(arc_point(b, 1.0)))
-        .min(arc_point(a, 1.0).distance(arc_point(b, 0.0)))
-        .min(arc_point(a, 1.0).distance(arc_point(b, 1.0)));
-    d = d
-        .min(arc_distance(a, arc_point(b, 0.5)))
-        .min(arc_distance(b, arc_point(a, 0.5)));
-    d
+fn concentric_arc_overlap(a: Arc, b: Arc) -> bool {
+    a.contains_angle(b.start_angle)
+        || a.contains_angle(b.end_angle)
+        || b.contains_angle(a.start_angle)
+        || b.contains_angle(a.end_angle)
+}
+
+fn arc_arc(a: Arc, b: Arc) -> f64 {
+    let ca = Circle {
+        center: a.center,
+        radius: a.radius,
+    };
+    let cb = Circle {
+        center: b.center,
+        radius: b.radius,
+    };
+    for p in circle_circle_intersections(ca, cb) {
+        if point_on_arc(a, p) && point_on_arc(b, p) {
+            return 0.0;
+        }
+    }
+    let mut best = f64::INFINITY;
+    for p in [a.start_point(), a.end_point()] {
+        best = best.min(arc_point_distance(b, p));
+    }
+    for p in [b.start_point(), b.end_point()] {
+        best = best.min(arc_point_distance(a, p));
+    }
+    for p in arc_extreme_candidates(a, b.center) {
+        best = best.min(arc_point_distance(b, p));
+    }
+    for p in arc_extreme_candidates(b, a.center) {
+        best = best.min(arc_point_distance(a, p));
+    }
+    if a.center.distance(b.center) <= EPSILON && concentric_arc_overlap(a, b) {
+        best.min((a.radius - b.radius).abs())
+    } else {
+        best
+    }
 }
 
 fn pair_distance(a: &Geometry, b: &Geometry) -> f64 {
