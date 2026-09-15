@@ -17,6 +17,7 @@ add_library(umlcad_occt_bridge SHARED
     cpp/circle.cpp
     cpp/line.cpp
     cpp/nurbs_curve.cpp
+    cpp/nurbs_surface.cpp
     cpp/tessellation.cpp
     cpp/exchange.cpp
 )
