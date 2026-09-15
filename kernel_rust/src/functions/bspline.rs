@@ -9,10 +9,6 @@ impl Point2 {
         Self { x: self.x + other.x, y: self.y + other.y }
     }
 
-    fn sub(self, other: Self) -> Self {
-        Self { x: self.x - other.x, y: self.y - other.y }
-    }
-
     fn scale(self, factor: f64) -> Self {
         Self { x: self.x * factor, y: self.y * factor }
     }
@@ -105,7 +101,6 @@ impl BSplineCurve2D {
             return Err(BSplineError::OutOfDomain);
         }
 
-        let n = self.control_points.len() - 1;
         let span = self.find_span(parameter);
         let mut work = self.control_points[span - self.degree..=span].to_vec();
 
@@ -124,7 +119,6 @@ impl BSplineCurve2D {
         if !result.x.is_finite() || !result.y.is_finite() {
             return Err(BSplineError::Overflow);
         }
-        let _ = n;
         Ok(result)
     }
 
@@ -185,13 +179,6 @@ impl BSplineCurve2D {
             mid = (low + high) / 2;
         }
         mid
-    }
-}
-
-impl Point2 {
-    #[allow(dead_code)]
-    fn _sub(self, other: Self) -> Self {
-        self.sub(other)
     }
 }
 
