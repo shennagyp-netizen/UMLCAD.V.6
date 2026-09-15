@@ -1,7 +1,12 @@
 use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryResult, ToleranceContext};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Point3 { pub x: f64, pub y: f64, pub z: f64 }
+pub struct Point3 {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
 impl Point3 {
     fn scale(self, s: f64) -> Self { Self { x: self.x * s, y: self.y * s, z: self.z * s } }
     fn add(self, other: Self) -> Self { Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z } }
@@ -88,10 +93,10 @@ fn quotient_mixed(d2:Homogeneous,wu:f64,wv:f64,w:f64,du:Point3,dv:Point3,p:Point
 
 #[cfg(test)]
 mod tests { use super::*;
-    fn bilinear()->NurbsSurface3DDefinition{NurbsSurface3DDefinition::new((1,1),vec![Point3{x:0.,y:0.,z:0.},Point3{x:0.,y:1.,z:1.},Point3{x:1.,y:0.,z:1.},Point3{x:1.,y:1.,z:2.}],vec![1.;4],(2,2),vec![0.,0.,1.,1.],vec![0.,0.,1.,1.])}
-    #[test]fn bilinear_surface_is_valid(){assert_eq!(bilinear().parameter_domain().unwrap(),((0.,1.),(0.,1.)))}
-    #[test]fn bilinear_differential_is_exact(){let d=bilinear().differential_at(.25,.75).unwrap();assert_eq!(d.point,Point3{x:.25,y:.75,z:1.});assert_eq!(d.du,Point3{x:1.,y:0.,z:1.});assert_eq!(d.dv,Point3{x:0.,y:1.,z:1.});assert_eq!(d.duu,Point3{x:0.,y:0.,z:0.});assert_eq!(d.duv,Point3{x:0.,y:0.,z:0.});assert_eq!(d.dvv,Point3{x:0.,y:0.,z:0.});assert!((d.normal().unwrap().norm()-1.).abs()<1e-14)}
-    #[test]fn out_of_domain_is_rejected(){assert_eq!(bilinear().differential_at(-.1,.5),Err(NurbsSurfaceEvaluationError::OutOfDomain))}
-    #[test]fn invalid_weight_is_rejected(){let mut s=bilinear();s.weights[2]=0.;assert!(s.differential_at(.5,.5).is_err())}
-    #[test]fn nondecreasing_knot_contract_is_enforced(){let mut s=bilinear();s.knots_v[2]=-1.;assert_eq!(s.validate(),Err(NurbsSurfaceDefinitionError::KnotsMustBeNondecreasing))}
+    fn bilinear()->NurbsSurface3DDefinition{NurbsSurface3DDefinition::new((1,1),vec![Point3{x:0.0,y:0.0,z:0.0},Point3{x:0.0,y:1.0,z:1.0},Point3{x:1.0,y:0.0,z:1.0},Point3{x:1.0,y:1.0,z:2.0}],vec![1.0;4],(2,2),vec![0.0,0.0,1.0,1.0],vec![0.0,0.0,1.0,1.0])}
+    #[test]fn bilinear_surface_is_valid(){assert_eq!(bilinear().parameter_domain().unwrap(),((0.0,1.0),(0.0,1.0)))}
+    #[test]fn bilinear_differential_is_exact(){let d=bilinear().differential_at(0.25,0.75).unwrap();assert_eq!(d.point,Point3{x:0.25,y:0.75,z:1.0});assert_eq!(d.du,Point3{x:1.0,y:0.0,z:1.0});assert_eq!(d.dv,Point3{x:0.0,y:1.0,z:1.0});assert_eq!(d.duu,Point3{x:0.0,y:0.0,z:0.0});assert_eq!(d.duv,Point3{x:0.0,y:0.0,z:0.0});assert_eq!(d.dvv,Point3{x:0.0,y:0.0,z:0.0});assert!((d.normal().unwrap().norm()-1.0).abs()<1e-14)}
+    #[test]fn out_of_domain_is_rejected(){assert_eq!(bilinear().differential_at(-0.1,0.5),Err(NurbsSurfaceEvaluationError::OutOfDomain))}
+    #[test]fn invalid_weight_is_rejected(){let mut s=bilinear();s.weights[2]=0.0;assert!(s.differential_at(0.5,0.5).is_err())}
+    #[test]fn nondecreasing_knot_contract_is_enforced(){let mut s=bilinear();s.knots_v[2]=-1.0;assert_eq!(s.validate(),Err(NurbsSurfaceDefinitionError::KnotsMustBeNondecreasing))}
 }
