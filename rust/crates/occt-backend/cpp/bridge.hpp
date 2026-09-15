@@ -13,6 +13,7 @@ int32_t umlcad_occt_torus(double major_radius,double minor_radius,umlcad_occt_sh
 int32_t umlcad_occt_circle_curve(double radius,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_line_curve(double x1,double y1,double z1,double x2,double y2,double z2,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_nurbs_curve3d(const double* poles_xyz,uint32_t pole_count,const double* weights,uint32_t weight_count,const double* knots,uint32_t knot_count,uint32_t degree,umlcad_occt_shape** out_shape);
+int32_t umlcad_occt_nurbs_surface3d(const double* poles_xyz,uint32_t count_u,uint32_t count_v,const double* weights,const double* knots_u,uint32_t knot_count_u,const double* knots_v,uint32_t knot_count_v,uint32_t degree_u,uint32_t degree_v,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_shape_curve_length(const umlcad_occt_shape* input,double* out_length);
 int32_t umlcad_occt_extrude_polygon(const double* points_xy,uint32_t point_count,double height,umlcad_occt_shape** out_shape);
 int32_t umlcad_occt_revolve_polygon(const double* profile_rz,uint32_t point_count,double angle_radians,umlcad_occt_shape** out_shape);
