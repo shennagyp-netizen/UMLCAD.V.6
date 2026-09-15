@@ -1,5 +1,6 @@
 use std::ffi::CString;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 
 use umlcad_v6_exchange_api::{ExchangeBackend, ExchangeDirection, ExchangeError, ExchangeEvidence, ExchangeFormat, ExchangeStatus};
 use umlcad_v6_geometry_api::{GeometryBackend, GeometryEvidence, GeometryKind, GeometryResult, GeometryStatus, ToleranceContext};
@@ -9,6 +10,15 @@ use super::{NativeShape, OcctBackend, OcctShape, OCCT_CONSTRUCTION_FAILED, OCCT_
 unsafe extern "C" {
     fn umlcad_occt_shape_export_file(input: *const NativeShape, format: i32, path: *const std::ffi::c_char) -> i32;
     fn umlcad_occt_shape_import_file(format: i32, path: *const std::ffi::c_char, out_shape: *mut *mut NativeShape) -> i32;
+}
+
+static EXCHANGE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn exchange_lock() -> Result<std::sync::MutexGuard<'static, ()>, ExchangeError> {
+    EXCHANGE_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .map_err(|_| ExchangeError::TranslationFailure)
 }
 
 fn format_code(format: ExchangeFormat) -> i32 {
@@ -64,6 +74,7 @@ impl ExchangeBackend for OcctBackend {
         tolerance
             .validate()
             .map_err(|_| ExchangeError::InvalidPath)?;
+        let _exchange_guard = exchange_lock()?;
         let destination = path_cstring(path)?;
         let status = unsafe {
             umlcad_occt_shape_export_file(shape.raw.as_ptr(), format_code(format), destination.as_ptr())
@@ -97,6 +108,7 @@ impl ExchangeBackend for OcctBackend {
         tolerance
             .validate()
             .map_err(|_| ExchangeError::InvalidPath)?;
+        let _exchange_guard = exchange_lock()?;
         let metadata = std::fs::metadata(path).map_err(|_| ExchangeError::IoFailure)?;
         if !metadata.is_file() || metadata.len() == 0 {
             return Err(ExchangeError::EmptyResult);
