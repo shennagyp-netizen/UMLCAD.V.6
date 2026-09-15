@@ -1,4 +1,5 @@
-use umlcad_kernel_rust::functions::sweeps::{CircularArcSweep, Point3, SweepArcError};
+use umlcad_kernel_rust::functions::surfaces::Point3;
+use umlcad_kernel_rust::functions::sweeps::{CircularArcSweep, SweepArcError};
 
 fn p(x: f64, y: f64, z: f64) -> Point3 { Point3 { x, y, z } }
 
