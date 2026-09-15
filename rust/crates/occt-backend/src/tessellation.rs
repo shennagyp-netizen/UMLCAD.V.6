@@ -1,5 +1,5 @@
-use super::{NativeShape, OcctBackend, OcctShape, OCCT_CONSTRUCTION_FAILED, OCCT_INTERNAL_ERROR, OCCT_INVALID_ARGUMENT, OCCT_NULL_SHAPE, OCCT_OK, OCCT_TRANSFORM_FAILED};
-use umlcad_v6_geometry_api::{GeometryError, ToleranceContext};
+use super::{NativeShape, OcctBackend, OCCT_CONSTRUCTION_FAILED, OCCT_INTERNAL_ERROR, OCCT_INVALID_ARGUMENT, OCCT_NULL_SHAPE, OCCT_OK, OCCT_TRANSFORM_FAILED};
+use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, ToleranceContext};
 use umlcad_v6_mesh_api::{Mesh, TessellationBackend, TessellationOptions, Triangle, Vertex};
 
 unsafe extern "C" {
@@ -33,7 +33,9 @@ impl TessellationBackend for OcctBackend {
         shape: &Self::Shape,
         options: TessellationOptions,
     ) -> Result<Mesh, GeometryError> {
-        options.validate().map_err(|_| GeometryError::InvalidInput("invalid tessellation options"))?;
+        options
+            .validate()
+            .map_err(|_| GeometryError::InvalidInput("invalid tessellation options"))?;
 
         let mut vertex_count = 0u32;
         let mut triangle_count = 0u32;
@@ -57,8 +59,6 @@ impl TessellationBackend for OcctBackend {
             return Err(GeometryError::Unsupported("OCCT produced an empty tessellation"));
         }
 
-        let vertex_capacity = vertex_count;
-        let triangle_capacity = triangle_count;
         let mut vertices_xyz = vec![0.0f64; vertex_count as usize * 3];
         let mut triangles_abc = vec![0u32; triangle_count as usize * 3];
         let status = unsafe {
@@ -67,10 +67,10 @@ impl TessellationBackend for OcctBackend {
                 options.linear_deflection,
                 options.angular_deflection_radians,
                 vertices_xyz.as_mut_ptr(),
-                vertex_capacity,
+                vertex_count,
                 &mut vertex_count,
                 triangles_abc.as_mut_ptr(),
-                triangle_capacity,
+                triangle_count,
                 &mut triangle_count,
             )
         };
@@ -81,17 +81,17 @@ impl TessellationBackend for OcctBackend {
             return Err(GeometryError::Unsupported("OCCT produced an empty tessellation"));
         }
 
-        let mut vertices = Vec::with_capacity(vertex_count as usize);
-        for chunk in vertices_xyz[..vertex_count as usize * 3].chunks_exact(3) {
-            vertices.push(Vertex { x: chunk[0], y: chunk[1], z: chunk[2] });
-        }
-        let mut triangles = Vec::with_capacity(triangle_count as usize);
-        for chunk in triangles_abc[..triangle_count as usize * 3].chunks_exact(3) {
-            triangles.push(Triangle { a: chunk[0], b: chunk[1], c: chunk[2] });
-        }
-
+        let vertices = vertices_xyz[..vertex_count as usize * 3]
+            .chunks_exact(3)
+            .map(|chunk| Vertex { x: chunk[0], y: chunk[1], z: chunk[2] })
+            .collect();
+        let triangles = triangles_abc[..triangle_count as usize * 3]
+            .chunks_exact(3)
+            .map(|chunk| Triangle { a: chunk[0], b: chunk[1], c: chunk[2] })
+            .collect();
         let mesh = Mesh { vertices, triangles };
-        mesh.validate().map_err(|_| GeometryError::Unsupported("OCCT tessellation failed semantic mesh validation"))?;
+        mesh.validate()
+            .map_err(|_| GeometryError::Unsupported("OCCT tessellation failed semantic mesh validation"))?;
         Ok(mesh)
     }
 }
@@ -99,7 +99,6 @@ impl TessellationBackend for OcctBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use umlcad_v6_geometry_api::GeometryBackend;
 
     const OPTIONS: TessellationOptions = TessellationOptions {
         linear_deflection: 0.1,
@@ -109,10 +108,8 @@ mod tests {
     #[test]
     fn box_tessellation_is_valid_and_repeatable() {
         let backend = OcctBackend::new();
-        let shape = backend
-            .box_solid(10.0, 20.0, 30.0, ToleranceContext { modeling: 1e-9, validation: 1e-9 })
-            .unwrap()
-            .shape;
+        let tolerance = ToleranceContext { modeling: 1e-9, validation: 1e-9 };
+        let shape = backend.box_solid(10.0, 20.0, 30.0, tolerance).unwrap().shape;
         let first = backend.tessellate(&shape, OPTIONS).unwrap();
         let second = backend.tessellate(&shape, OPTIONS).unwrap();
         assert_eq!(first, second);
@@ -124,10 +121,8 @@ mod tests {
     #[test]
     fn invalid_tessellation_options_fail_closed_before_native_call() {
         let backend = OcctBackend::new();
-        let shape = backend
-            .box_solid(10.0, 20.0, 30.0, ToleranceContext { modeling: 1e-9, validation: 1e-9 })
-            .unwrap()
-            .shape;
+        let tolerance = ToleranceContext { modeling: 1e-9, validation: 1e-9 };
+        let shape = backend.box_solid(10.0, 20.0, 30.0, tolerance).unwrap().shape;
         let err = backend.tessellate(
             &shape,
             TessellationOptions {
