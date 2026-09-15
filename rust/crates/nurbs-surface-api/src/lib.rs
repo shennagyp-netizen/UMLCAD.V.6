@@ -9,7 +9,6 @@ pub struct Point3 {
 
 impl Point3 {
     fn scale(self, s: f64) -> Self { Self { x: self.x * s, y: self.y * s, z: self.z * s } }
-    fn add(self, other: Self) -> Self { Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z } }
     pub fn dot(self, other: Self) -> f64 { self.x * other.x + self.y * other.y + self.z * other.z }
     pub fn cross(self, other: Self) -> Self { Self { x: self.y * other.z - self.z * other.y, y: self.z * other.x - self.x * other.z, z: self.x * other.y - self.y * other.x } }
     pub fn norm(self) -> f64 { self.x.hypot(self.y.hypot(self.z)) }
