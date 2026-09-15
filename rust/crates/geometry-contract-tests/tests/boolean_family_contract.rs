@@ -8,6 +8,11 @@ fn shifted_box(backend: &OcctBackend, x: f64) -> umlcad_v6_occt_backend::OcctSha
     backend.translate(&base, x, 0.0, 0.0, TOLERANCE).unwrap().shape
 }
 
+fn equivalent_geometry(backend: &OcctBackend, left: &umlcad_v6_occt_backend::OcctShape, right: &umlcad_v6_occt_backend::OcctShape) {
+    assert_eq!(backend.bounding_box(left, TOLERANCE).unwrap(), backend.bounding_box(right, TOLERANCE).unwrap());
+    assert_eq!(backend.topology_counts(left, TOLERANCE).unwrap(), backend.topology_counts(right, TOLERANCE).unwrap());
+}
+
 #[test]
 fn common_and_cut_produce_valid_results() {
     let backend = OcctBackend::new();
@@ -90,6 +95,31 @@ fn coincident_boxes_have_explicit_boolean_semantics() {
 }
 
 #[test]
+fn boolean_union_and_common_are_commutative() {
+    let backend = OcctBackend::new();
+    let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+    let right = shifted_box(&backend, 4.0);
+    let union_lr = backend.fuse(&left, &right, TOLERANCE).unwrap().shape;
+    let union_rl = backend.fuse(&right, &left, TOLERANCE).unwrap().shape;
+    equivalent_geometry(&backend, &union_lr, &union_rl);
+    let common_lr = backend.common(&left, &right, TOLERANCE).unwrap().shape;
+    let common_rl = backend.common(&right, &left, TOLERANCE).unwrap().shape;
+    equivalent_geometry(&backend, &common_lr, &common_rl);
+}
+
+#[test]
+fn boolean_cut_is_explicitly_non_commutative() {
+    let backend = OcctBackend::new();
+    let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
+    let right = shifted_box(&backend, 4.0);
+    let left_minus_right = backend.cut(&left, &right, TOLERANCE).unwrap().shape;
+    let right_minus_left = backend.cut(&right, &left, TOLERANCE).unwrap().shape;
+    let first = backend.bounding_box(&left_minus_right, TOLERANCE).unwrap();
+    let second = backend.bounding_box(&right_minus_left, TOLERANCE).unwrap();
+    assert!((first.min_x - second.min_x).abs() > 1e-9 || (first.max_x - second.max_x).abs() > 1e-9 || backend.topology_counts(&left_minus_right, TOLERANCE).unwrap() != backend.topology_counts(&right_minus_left, TOLERANCE).unwrap());
+}
+
+#[test]
 fn near_degenerate_overlap_is_not_accepted_as_confident_common_geometry() {
     let backend = OcctBackend::new();
     let left = backend.box_solid(10.0, 10.0, 10.0, TOLERANCE).unwrap().shape;
@@ -105,7 +135,6 @@ fn boolean_results_are_deterministic_for_identical_operands() {
     for operation in [0_u8, 1_u8, 2_u8] {
         let first = match operation { 0 => backend.fuse(&left,&right,TOLERANCE).unwrap().shape, 1 => backend.common(&left,&right,TOLERANCE).unwrap().shape, _ => backend.cut(&left,&right,TOLERANCE).unwrap().shape };
         let second = match operation { 0 => backend.fuse(&left,&right,TOLERANCE).unwrap().shape, 1 => backend.common(&left,&right,TOLERANCE).unwrap().shape, _ => backend.cut(&left,&right,TOLERANCE).unwrap().shape };
-        assert_eq!(backend.bounding_box(&first,TOLERANCE).unwrap(), backend.bounding_box(&second,TOLERANCE).unwrap());
-        assert_eq!(backend.topology_counts(&first,TOLERANCE).unwrap(), backend.topology_counts(&second,TOLERANCE).unwrap());
+        equivalent_geometry(&backend, &first, &second);
     }
 }
