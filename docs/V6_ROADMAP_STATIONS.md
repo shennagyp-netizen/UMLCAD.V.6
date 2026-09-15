@@ -90,6 +90,17 @@ Required work:
 7. realize supported operations through OCCT only after semantic validation, keeping native intersection algorithms behind opaque boundaries;
 8. preserve deterministic ordering/evidence and fail closed on ambiguous or unsupported solutions.
 
+Current S12 implementation checkpoint:
+
+- line-segment / NURBS-surface intersection has a backend-neutral contract, deterministic multi-seed Newton oracle, OCCT `GeomAPI_IntCS` realization, segment-domain filtering, and native-point conformance;
+- planar affine 2x2 NURBS surface / surface intersection has an independent exact plane-plane oracle, bounded UV-domain clipping, explicit parallel/coincident failure, OCCT `GeomAPI_IntSS` realization, and native intersection-endpoint conformance;
+- planar affine 2x2 NURBS point / surface closest-point and distance semantics now have an independent bounded-parallelogram oracle and OCCT `GeomAPI_ProjectPointOnSurf` conformance;
+- arbitrary NURBS parameter intervals are handled explicitly by normalized semantic coordinates rather than assuming `[0,1]` domains;
+- native OCCT remains opaque to the semantic crates;
+- the current surface/surface semantic implementation is intentionally restricted to exact affine planar patches and is not yet a general NURBS surface/surface root solver;
+- line/surface tangent and coincident/underdetermined classification still requires a stronger semantic treatment before the station can close;
+- intersection-driven curve splitting / generalized surface trimming remains outstanding.
+
 **S12 exit condition:** representative curve-surface and surface-surface operations are independently defined, numerically validated, natively realized, deterministic, and proven not to silently convert ambiguous geometric relations into arbitrary topology.
 
 ## Following stations
