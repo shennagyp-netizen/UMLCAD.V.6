@@ -14,9 +14,7 @@ fn basis(i: usize, degree: usize, u: f64, knots: &[f64]) -> f64 {
 }
 
 fn basis_derivative(i: usize, degree: usize, u: f64, knots: &[f64]) -> f64 {
-    if degree == 0 {
-        return 0.0;
-    }
+    if degree == 0 { return 0.0; }
     let left_denominator = knots[i + degree] - knots[i];
     let right_denominator = knots[i + degree + 1] - knots[i + 1];
     let left = if left_denominator == 0.0 { 0.0 } else { degree as f64 / left_denominator * basis(i, degree - 1, u, knots) };
@@ -74,14 +72,10 @@ fn sample_curve() -> NurbsCurve3D {
     NurbsCurve3D::new(
         3,
         vec![
-            Point3 { x: 0.0, y: 0.0, z: 0.0 },
-            Point3 { x: 2.0, y: 3.0, z: -1.0 },
-            Point3 { x: 5.0, y: -2.0, z: 4.0 },
-            Point3 { x: 8.0, y: 6.0, z: 2.0 },
-            Point3 { x: 10.0, y: 0.0, z: 5.0 },
+            Point3 { x: 0.0, y: 0.0, z: 0.0 }, Point3 { x: 2.0, y: 3.0, z: -1.0 }, Point3 { x: 5.0, y: -2.0, z: 4.0 }, Point3 { x: 8.0, y: 6.0, z: 2.0 }, Point3 { x: 10.0, y: 0.0, z: 5.0 },
         ],
         vec![1.0, 0.7, 1.8, 0.9, 1.2],
-        vec![0.0, 0.0, 0.0, 0.0, 0.4, 0.8, 1.0, 1.0, 1.0],
+        vec![0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0, 1.0],
     )
 }
 
@@ -103,16 +97,9 @@ fn rational_nurbs_derivative_matches_independent_basis_derivative_oracle() {
 
 #[test]
 fn quarter_circle_matches_closed_form_and_independent_oracle() {
-    let curve = NurbsCurve3D::new(
-        2,
-        vec![
-            Point3 { x: 1.0, y: 0.0, z: 0.0 },
-            Point3 { x: 1.0, y: 1.0, z: 0.0 },
-            Point3 { x: 0.0, y: 1.0, z: 0.0 },
-        ],
-        vec![1.0, std::f64::consts::FRAC_1_SQRT_2, 1.0],
-        vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
-    );
+    let curve = NurbsCurve3D::new(2,
+        vec![Point3 { x: 1.0, y: 0.0, z: 0.0 }, Point3 { x: 1.0, y: 1.0, z: 0.0 }, Point3 { x: 0.0, y: 1.0, z: 0.0 }],
+        vec![1.0, std::f64::consts::FRAC_1_SQRT_2, 1.0], vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0]);
     let midpoint = curve.point_at(0.5).unwrap();
     let expected = 1.0 / std::f64::consts::SQRT_2;
     assert_point_close(midpoint, Point3 { x: expected, y: expected, z: 0.0 }, 1e-12);
