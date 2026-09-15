@@ -1,3 +1,4 @@
+pub mod bezier;
 pub mod constraints;
 pub mod curves3d;
 pub mod diagnostics;
