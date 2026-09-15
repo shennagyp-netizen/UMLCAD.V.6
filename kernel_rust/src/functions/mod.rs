@@ -9,5 +9,6 @@ pub mod snapshot;
 pub mod solver;
 pub mod spatial;
 pub mod surfaces;
+pub mod sweeps;
 pub mod topology;
 pub mod validation;
