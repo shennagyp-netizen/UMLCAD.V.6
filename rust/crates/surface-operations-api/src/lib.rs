@@ -3,7 +3,7 @@ use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceEvaluati
 mod surface_surface;
 pub use surface_surface::{
     intersect_planar_nurbs_surfaces, SurfaceIntersectionEndpoint, SurfaceIntersectionSegment,
-    SurfaceSurfaceIntersectionError, SurfaceSurfaceIntersectionResult,
+    SurfaceSurfaceIntersectionError, SurfaceSurfaceIntersectionResult, SurfaceSurfaceOperations,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
