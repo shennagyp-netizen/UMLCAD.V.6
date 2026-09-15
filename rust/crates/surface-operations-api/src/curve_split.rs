@@ -1,4 +1,7 @@
-use crate::{IntersectionStatus, LineSegment3D, LineSurfaceIntersectionError};
+use crate::{
+    intersect_line_segment_nurbs_surface, IntersectionStatus, LineSegment3D,
+    LineSurfaceIntersectionError,
+};
 use umlcad_v6_nurbs_surface_api::Point3;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -69,22 +72,41 @@ pub fn split_line_segment_at_intersections(
 mod tests {
     use super::*;
 
+    fn plane() -> umlcad_v6_nurbs_surface_api::NurbsSurface3DDefinition {
+        umlcad_v6_nurbs_surface_api::NurbsSurface3DDefinition::new(
+            (1, 1),
+            vec![
+                Point3 { x: 0.0, y: 0.0, z: 0.0 },
+                Point3 { x: 0.0, y: 1.0, z: 0.0 },
+                Point3 { x: 1.0, y: 0.0, z: 0.0 },
+                Point3 { x: 1.0, y: 1.0, z: 0.0 },
+            ],
+            vec![1.0; 4],
+            (2, 2),
+            vec![0.0, 0.0, 1.0, 1.0],
+            vec![0.0, 0.0, 1.0, 1.0],
+        )
+    }
+
     #[test]
     fn unique_interior_cut_is_deterministic() {
         let line = LineSegment3D {
-            start: Point3 { x: 0.0, y: 0.0, z: 0.0 },
-            end: Point3 { x: 10.0, y: 0.0, z: 0.0 },
+            start: Point3 { x: 0.0, y: 0.0, z: -1.0 },
+            end: Point3 { x: 0.0, y: 0.0, z: 1.0 },
         };
+        let intersection = intersect_line_segment_nurbs_surface(line, &plane(), 1e-10).unwrap();
+        assert_eq!(intersection.status, IntersectionStatus::Unique);
+        let parameter = intersection.points[0].line_parameter;
         let split = split_line_segment_at_intersections(
             line,
-            IntersectionStatus::Unique,
-            &[0.75],
+            intersection.status,
+            &[parameter],
             1e-10,
         )
         .unwrap();
-        assert_eq!(split.parameters, vec![0.0, 0.75, 1.0]);
         assert_eq!(split.segments.len(), 2);
-        assert!((split.segments[0].end.x - 7.5).abs() < 1e-12);
+        assert_eq!(split.parameters, vec![0.0, 0.5, 1.0]);
+        assert!((split.segments[0].end.z).abs() < 1e-10);
     }
 
     #[test]
