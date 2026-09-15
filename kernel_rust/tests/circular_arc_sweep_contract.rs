@@ -22,7 +22,6 @@ fn circular_arc_sweep_surface_parameterization_matches_torus_geometry() {
     assert!((q.x - expected).abs() < 1e-12);
     assert!((q.y - expected).abs() < 1e-12);
     assert!(q.z.abs() < 1e-12);
-
     let top = sweep.surface_point_at(core::f64::consts::FRAC_PI_4, core::f64::consts::FRAC_PI_2).unwrap();
     assert!((top.x - expected).abs() < 1e-12);
     assert!((top.y - expected).abs() < 1e-12);
@@ -33,9 +32,9 @@ fn circular_arc_sweep_surface_parameterization_matches_torus_geometry() {
 fn circular_arc_sweep_bounding_box_is_analytically_bounded() {
     let sweep = quarter_tube();
     let bounds = sweep.bounding_box().unwrap();
-    assert!((bounds.min.x + 2.0).abs() < 1e-12);
+    assert!(bounds.min.x.abs() < 1e-12);
     assert!((bounds.max.x - 12.0).abs() < 1e-12);
-    assert!((bounds.min.y + 2.0).abs() < 1e-12);
+    assert!(bounds.min.y.abs() < 1e-12);
     assert!((bounds.max.y - 12.0).abs() < 1e-12);
     assert!((bounds.min.z + 2.0).abs() < 1e-12);
     assert!((bounds.max.z - 2.0).abs() < 1e-12);
@@ -55,19 +54,10 @@ fn circular_arc_sweep_is_immutable_under_translation() {
 
 #[test]
 fn circular_arc_sweep_rejects_invalid_domain_and_self_intersection() {
-    assert_eq!(
-        CircularArcSweep::new(p(0.0, 0.0, 0.0), 1.0, 1.0, 0.0, 1.0).validate(),
-        Err(SweepArcError::InvalidGeometry)
-    );
-    assert!(
-        CircularArcSweep::new(p(0.0, 0.0, 0.0), 10.0, -1.0, 0.0, 1.0).validate().is_err()
-    );
-    assert!(
-        CircularArcSweep::new(p(0.0, 0.0, 0.0), 10.0, 2.0, 1.0, 1.0).validate().is_err()
-    );
-    assert!(
-        CircularArcSweep::new(p(f64::NAN, 0.0, 0.0), 10.0, 2.0, 0.0, 1.0).validate().is_err()
-    );
+    assert_eq!(CircularArcSweep::new(p(0.0, 0.0, 0.0), 1.0, 1.0, 0.0, 1.0).validate(), Err(SweepArcError::InvalidGeometry));
+    assert!(CircularArcSweep::new(p(0.0, 0.0, 0.0), 10.0, -1.0, 0.0, 1.0).validate().is_err());
+    assert!(CircularArcSweep::new(p(0.0, 0.0, 0.0), 10.0, 2.0, 1.0, 1.0).validate().is_err());
+    assert!(CircularArcSweep::new(p(f64::NAN, 0.0, 0.0), 10.0, 2.0, 0.0, 1.0).validate().is_err());
 }
 
 #[test]
