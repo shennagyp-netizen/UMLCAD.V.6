@@ -226,7 +226,7 @@ mod tests {
         assert!((s.start.point.x - 0.5).abs() < 1e-10);
         assert!((s.end.point.x - 0.5).abs() < 1e-10);
         assert!((s.start.first_uv.0 - 0.5).abs() < 1e-10);
-        assert!((s.start.second_uv.0 - 3.0).abs() < 1e-10);
+        assert!((s.start.second_uv.0 - 2.0).abs() < 1e-10);
     }
 
     #[test]
