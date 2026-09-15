@@ -1,5 +1,5 @@
 use std::path::Path;
-use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryResult, ToleranceContext};
+use umlcad_v6_geometry_api::{GeometryBackend, GeometryResult, ToleranceContext};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExchangeFormat {
