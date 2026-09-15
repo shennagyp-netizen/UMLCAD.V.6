@@ -1,4 +1,5 @@
-use umlcad_kernel_rust::functions::nurbs::{NurbsCurve2D, NurbsError, Point2};
+use umlcad_kernel_rust::functions::{bspline, nurbs};
+use nurbs::{NurbsCurve2D, NurbsError, Point2};
 
 fn p(x: f64, y: f64) -> Point2 {
     Point2 { x, y }
@@ -34,9 +35,13 @@ fn rational_curve_reduces_to_bspline_when_all_weights_are_one() {
         vec![1.0, 1.0, 1.0],
         vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
     );
-    let ordinary = umlcad_kernel_rust::functions::bspline::BSplineCurve2D::new(
+    let ordinary = bspline::BSplineCurve2D::new(
         2,
-        vec![p(0.0, 0.0), p(1.0, 2.0), p(3.0, 0.0)],
+        vec![
+            bspline::Point2 { x: 0.0, y: 0.0 },
+            bspline::Point2 { x: 1.0, y: 2.0 },
+            bspline::Point2 { x: 3.0, y: 0.0 },
+        ],
         vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
     );
 
