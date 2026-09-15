@@ -25,6 +25,7 @@ pub trait GeometryBackend {
  fn sphere_solid(&self,radius:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
  fn cone_solid(&self,base_radius:f64,top_radius:f64,height:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
  fn torus_solid(&self,major_radius:f64,minor_radius:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
+ fn circle_curve(&self,radius:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
  fn extrude_polygon(&self,points:&[(f64,f64)],height:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
  fn revolve_polygon(&self,profile_rz:&[(f64,f64)],angle_radians:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
  fn loft_between_polygons(&self,lower:&[(f64,f64)],lower_z:f64,upper:&[(f64,f64)],upper_z:f64,tolerance:ToleranceContext)->Result<GeometryResult<Self::Shape>,GeometryError>;
