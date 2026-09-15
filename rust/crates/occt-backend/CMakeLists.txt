@@ -20,6 +20,7 @@ add_library(umlcad_occt_bridge SHARED
     cpp/nurbs_surface.cpp
     cpp/nurbs_surface_differential.cpp
     cpp/trimmed_surface.cpp
+    cpp/curve_surface_operations.cpp
     cpp/tessellation.cpp
     cpp/exchange.cpp
 )
