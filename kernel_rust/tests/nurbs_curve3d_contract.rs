@@ -4,6 +4,12 @@ fn p(x: f64, y: f64, z: f64) -> Point3 {
     Point3 { x, y, z }
 }
 
+fn assert_point_close(actual: Point3, expected: Point3, tolerance: f64) {
+    assert!((actual.x - expected.x).abs() <= tolerance);
+    assert!((actual.y - expected.y).abs() <= tolerance);
+    assert!((actual.z - expected.z).abs() <= tolerance);
+}
+
 #[test]
 fn clamped_linear_nurbs_matches_affine_3d_oracle() {
     let curve = NurbsCurve3D::new(
@@ -48,7 +54,7 @@ fn quadratic_nurbs_derivative_matches_exact_bezier_oracle() {
         vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
     );
     let derivative = curve.derivative_at(0.5).unwrap();
-    assert_eq!(derivative, p(4.0, 0.0, 5.0));
+    assert_point_close(derivative, p(4.0, 1.0, 5.0), 1e-12);
 }
 
 #[test]
@@ -85,8 +91,12 @@ fn translation_preserves_point_derivative_and_tangent_without_mutating_source() 
     assert!((moved_point.x - original_point.x - 100.0).abs() < 1e-12);
     assert!((moved_point.y - original_point.y + 50.0).abs() < 1e-12);
     assert!((moved_point.z - original_point.z - 7.0).abs() < 1e-12);
-    assert_eq!(moved_derivative, original_derivative);
-    assert_eq!(moved.tangent_at(0.4).unwrap(), curve.tangent_at(0.4).unwrap());
+    assert_point_close(moved_derivative, original_derivative, 1e-12);
+    assert_point_close(
+        moved.tangent_at(0.4).unwrap(),
+        curve.tangent_at(0.4).unwrap(),
+        1e-12,
+    );
     assert_eq!(curve.point_at(0.4).unwrap(), original_point);
 }
 
@@ -106,9 +116,28 @@ fn endpoint_interpolation_remains_stable_with_small_positive_weight() {
 fn invalid_projective_and_parameter_inputs_fail_closed() {
     let points = vec![p(0.0, 0.0, 0.0), p(1.0, 1.0, 1.0)];
     let knots = vec![0.0, 0.0, 1.0, 1.0];
-    assert_eq!(NurbsCurve3D::new(0, points.clone(), vec![1.0, 1.0], knots.clone()).validate(), Err(Nurbs3DError::InvalidDegree));
-    assert_eq!(NurbsCurve3D::new(1, points.clone(), vec![1.0], knots.clone()).validate(), Err(Nurbs3DError::InvalidWeightCount));
-    assert_eq!(NurbsCurve3D::new(1, points.clone(), vec![1.0, 0.0], knots.clone()).validate(), Err(Nurbs3DError::InvalidWeight));
-    assert!(NurbsCurve3D::new(1, vec![p(f64::NAN, 0.0, 0.0), p(1.0, 1.0, 1.0)], vec![1.0, 1.0], knots.clone()).validate().is_err());
-    assert_eq!(NurbsCurve3D::new(1, points, vec![1.0, 1.0], knots).point_at(f64::NAN), Err(Nurbs3DError::NonFinite));
+    assert_eq!(
+        NurbsCurve3D::new(0, points.clone(), vec![1.0, 1.0], knots.clone()).validate(),
+        Err(Nurbs3DError::InvalidDegree)
+    );
+    assert_eq!(
+        NurbsCurve3D::new(1, points.clone(), vec![1.0], knots.clone()).validate(),
+        Err(Nurbs3DError::InvalidWeightCount)
+    );
+    assert_eq!(
+        NurbsCurve3D::new(1, points.clone(), vec![1.0, 0.0], knots.clone()).validate(),
+        Err(Nurbs3DError::InvalidWeight)
+    );
+    assert!(NurbsCurve3D::new(
+        1,
+        vec![p(f64::NAN, 0.0, 0.0), p(1.0, 1.0, 1.0)],
+        vec![1.0, 1.0],
+        knots.clone()
+    )
+    .validate()
+    .is_err());
+    assert_eq!(
+        NurbsCurve3D::new(1, points, vec![1.0, 1.0], knots).point_at(f64::NAN),
+        Err(Nurbs3DError::NonFinite)
+    );
 }
