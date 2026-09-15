@@ -18,9 +18,10 @@ add_library(umlcad_occt_bridge SHARED
     cpp/line.cpp
     cpp/nurbs_curve.cpp
     cpp/tessellation.cpp
+    cpp/exchange.cpp
 )
 target_include_directories(umlcad_occt_bridge PRIVATE ${OpenCASCADE_INCLUDE_DIR})
 target_link_directories(umlcad_occt_bridge PRIVATE ${OpenCASCADE_LIBRARY_DIR})
-target_link_libraries(umlcad_occt_bridge PRIVATE TKMesh TKBool TKOffset TKFillet TKPrim TKTopAlgo TKBRep TKGeomAlgo TKGeomBase TKG3d TKG2d TKMath TKernel)
+target_link_libraries(umlcad_occt_bridge PRIVATE TKSTEP TKIGES TKXSBase TKMesh TKBool TKOffset TKFillet TKPrim TKTopAlgo TKBRep TKGeomAlgo TKGeomBase TKG3d TKG2d TKMath TKernel)
 set_target_properties(umlcad_occt_bridge PROPERTIES OUTPUT_NAME "umlcad_occt_bridge" LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 install(TARGETS umlcad_occt_bridge LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
