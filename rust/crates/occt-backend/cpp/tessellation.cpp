@@ -6,6 +6,7 @@
 #include <TopAbs_ShapeEnum.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopLoc_Location.hxx>
+#include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <Poly_Triangulation.hxx>
@@ -13,6 +14,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <utility>
 
 struct umlcad_occt_shape { TopoDS_Shape value; };
 
