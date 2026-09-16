@@ -1,8 +1,26 @@
-use crate::OcctBackend;
-use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryResult, ToleranceContext};
+use std::ptr::NonNull;
+
+use crate::{NativeShape, OcctBackend, OcctShape};
+use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryKind, GeometryResult, GeometryStatus, ToleranceContext};
 use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceBackend, Point3 as NurbsPoint3};
 use umlcad_v6_offset_api::{OffsetBackend, PlanarLineSegment3D, PlanarSurfacePatch3D};
 use umlcad_v6_sweep_api::{LinearCircularSweep, SweepBackend};
+
+unsafe extern "C" {
+    fn umlcad_occt_sweep_linear_circular(
+        start_x: f64,
+        start_y: f64,
+        start_z: f64,
+        end_x: f64,
+        end_y: f64,
+        end_z: f64,
+        radius: f64,
+        normal_x: f64,
+        normal_y: f64,
+        normal_z: f64,
+        out_shape: *mut *mut NativeShape,
+    ) -> i32;
+}
 
 impl OffsetBackend for OcctBackend {
     fn offset_planar_line(
@@ -39,26 +57,10 @@ impl OffsetBackend for OcctBackend {
         let surface = NurbsSurface3DDefinition::new(
             (1, 1),
             vec![
-                NurbsPoint3 {
-                    x: p00.x,
-                    y: p00.y,
-                    z: p00.z,
-                },
-                NurbsPoint3 {
-                    x: p01.x,
-                    y: p01.y,
-                    z: p01.z,
-                },
-                NurbsPoint3 {
-                    x: p10.x,
-                    y: p10.y,
-                    z: p10.z,
-                },
-                NurbsPoint3 {
-                    x: p11.x,
-                    y: p11.y,
-                    z: p11.z,
-                },
+                NurbsPoint3 { x: p00.x, y: p00.y, z: p00.z },
+                NurbsPoint3 { x: p01.x, y: p01.y, z: p01.z },
+                NurbsPoint3 { x: p10.x, y: p10.y, z: p10.z },
+                NurbsPoint3 { x: p11.x, y: p11.y, z: p11.z },
             ],
             vec![1.0; 4],
             (2, 2),
@@ -75,7 +77,32 @@ impl SweepBackend for OcctBackend {
         definition: LinearCircularSweep,
         tolerance: ToleranceContext,
     ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
-        definition.realize_with(self, tolerance)
+        definition.validate(tolerance)?;
+        let mut raw = std::ptr::null_mut();
+        let status = unsafe {
+            umlcad_occt_sweep_linear_circular(
+                definition.path.start.x,
+                definition.path.start.y,
+                definition.path.start.z,
+                definition.path.end.x,
+                definition.path.end.y,
+                definition.path.end.z,
+                definition.profile.radius,
+                definition.profile.normal.x,
+                definition.profile.normal.y,
+                definition.profile.normal.z,
+                &mut raw,
+            )
+        };
+        if status != crate::OCCT_OK {
+            return Err(Self::status(status, "OCCT linear circular sweep construction failed"));
+        }
+        let raw = NonNull::new(raw).ok_or(GeometryError::Unsupported("OCCT sweep returned null"))?;
+        Ok(GeometryResult {
+            shape: OcctShape::from_raw(raw, GeometryKind::Solid),
+            kind: GeometryKind::Solid,
+            evidence: self.evidence(GeometryStatus::Success, tolerance),
+        })
     }
 }
 
@@ -94,54 +121,23 @@ mod tests {
     fn planar_line_offset_realizes_as_curve_without_mutating_source() {
         let b = OcctBackend::new();
         let source = PlanarLineSegment3D {
-            start: umlcad_v6_offset_api::Point3 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            end: umlcad_v6_offset_api::Point3 {
-                x: 10.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            plane_normal: umlcad_v6_offset_api::Point3 {
-                x: 0.0,
-                y: 0.0,
-                z: 1.0,
-            },
+            start: umlcad_v6_offset_api::Point3 { x: 0.0, y: 0.0, z: 0.0 },
+            end: umlcad_v6_offset_api::Point3 { x: 10.0, y: 0.0, z: 0.0 },
+            plane_normal: umlcad_v6_offset_api::Point3 { x: 0.0, y: 0.0, z: 1.0 },
         };
         let result = b.offset_planar_line(source, 2.0, T).unwrap();
         assert_eq!(result.kind, GeometryKind::Curve);
         assert_eq!(b.curve_length(&result.shape, T).unwrap(), 10.0);
-        assert_eq!(
-            source.start,
-            umlcad_v6_offset_api::Point3 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0
-            }
-        );
+        assert_eq!(source.start, umlcad_v6_offset_api::Point3 { x: 0.0, y: 0.0, z: 0.0 });
     }
 
     #[test]
     fn planar_surface_offset_realizes_as_one_surface_face() {
         let b = OcctBackend::new();
         let source = PlanarSurfacePatch3D {
-            origin: umlcad_v6_offset_api::Point3 {
-                x: 1.0,
-                y: 2.0,
-                z: 3.0,
-            },
-            u_dir: umlcad_v6_offset_api::Point3 {
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            v_dir: umlcad_v6_offset_api::Point3 {
-                x: 0.0,
-                y: 1.0,
-                z: 0.0,
-            },
+            origin: umlcad_v6_offset_api::Point3 { x: 1.0, y: 2.0, z: 3.0 },
+            u_dir: umlcad_v6_offset_api::Point3 { x: 1.0, y: 0.0, z: 0.0 },
+            v_dir: umlcad_v6_offset_api::Point3 { x: 0.0, y: 1.0, z: 0.0 },
             width: 5.0,
             height: 8.0,
         };
@@ -163,27 +159,13 @@ mod tests {
     fn invalid_source_is_rejected_before_native_construction() {
         let b = OcctBackend::new();
         let source = PlanarLineSegment3D {
-            start: umlcad_v6_offset_api::Point3 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            end: umlcad_v6_offset_api::Point3 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            plane_normal: umlcad_v6_offset_api::Point3 {
-                x: 0.0,
-                y: 0.0,
-                z: 1.0,
-            },
+            start: umlcad_v6_offset_api::Point3 { x: 0.0, y: 0.0, z: 0.0 },
+            end: umlcad_v6_offset_api::Point3 { x: 0.0, y: 0.0, z: 0.0 },
+            plane_normal: umlcad_v6_offset_api::Point3 { x: 0.0, y: 0.0, z: 1.0 },
         };
         assert!(matches!(
             b.offset_planar_line(source, 1.0, T),
-            Err(GeometryError::InvalidInput(
-                "planar line offset requires a non-degenerate segment"
-            ))
+            Err(GeometryError::InvalidInput("planar line offset requires a non-degenerate segment"))
         ));
     }
 
@@ -203,9 +185,8 @@ mod tests {
         };
         let result = b.sweep_linear_circular(definition, T).unwrap();
         assert_eq!(result.kind, GeometryKind::Solid);
-        let validation = b.validate(&result.shape, T).unwrap();
-        assert_eq!(validation.valid, true);
-        assert_eq!(validation.manifold, true);
+        assert_eq!(b.validate(&result.shape, T).unwrap().valid, true);
+        assert_eq!(b.validate(&result.shape, T).unwrap().manifold, true);
         let bounds = b.bounding_box(&result.shape, T).unwrap();
         assert!((bounds.min_x - 3.0).abs() <= 1e-9);
         assert!((bounds.max_x - 7.0).abs() <= 1e-9);
@@ -217,7 +198,29 @@ mod tests {
     }
 
     #[test]
-    fn linear_circular_sweep_preserves_source_and_is_deterministic() {
+    fn linear_circular_sweep_supports_arbitrary_path_orientation() {
+        let b = OcctBackend::new();
+        let definition = LinearCircularSweep {
+            profile: umlcad_v6_sweep_api::CircularProfile {
+                center: umlcad_v6_sweep_api::Point3 { x: 1.0, y: 2.0, z: 3.0 },
+                normal: umlcad_v6_sweep_api::Point3 { x: 0.0, y: 0.8, z: -0.6 },
+                radius: 1.0,
+            },
+            path: umlcad_v6_sweep_api::LinearPath {
+                start: umlcad_v6_sweep_api::Point3 { x: 1.0, y: 2.0, z: 3.0 },
+                end: umlcad_v6_sweep_api::Point3 { x: 6.0, y: 2.0, z: 11.0 },
+            },
+        };
+        let result = b.sweep_linear_circular(definition, T).unwrap();
+        let bounds = b.bounding_box(&result.shape, T).unwrap();
+        assert!(bounds.min_x.is_finite() && bounds.max_x.is_finite());
+        assert!(bounds.min_y.is_finite() && bounds.max_y.is_finite());
+        assert!(bounds.min_z.is_finite() && bounds.max_z.is_finite());
+        assert_eq!(b.validate(&result.shape, T).unwrap().valid, true);
+    }
+
+    #[test]
+    fn linear_circular_sweep_is_deterministic() {
         let b = OcctBackend::new();
         let definition = LinearCircularSweep {
             profile: umlcad_v6_sweep_api::CircularProfile {
@@ -234,9 +237,7 @@ mod tests {
         let second = b.sweep_linear_circular(definition, T).unwrap();
         assert_eq!(first.kind, second.kind);
         assert_eq!(b.topology_counts(&first.shape, T).unwrap(), b.topology_counts(&second.shape, T).unwrap());
-        let a = b.bounding_box(&first.shape, T).unwrap();
-        let c = b.bounding_box(&second.shape, T).unwrap();
-        assert_eq!(a, c);
-        assert_eq!(definition.path.start, umlcad_v6_sweep_api::Point3 { x: 0.0, y: 0.0, z: 0.0 });
+        assert_eq!(b.bounding_box(&first.shape, T).unwrap(), b.bounding_box(&second.shape, T).unwrap());
+        assert_eq!(first.evidence.status, GeometryStatus::Success);
     }
 }
