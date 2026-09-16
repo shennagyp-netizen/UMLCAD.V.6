@@ -27,6 +27,7 @@ mod tests {
     use super::*;
     use umlcad_v6_geometry_api::{GeometryBackend, GeometryKind};
     const T: ToleranceContext = ToleranceContext { modeling:1e-9, validation:1e-9 };
+    const OCCT_PLANAR_SURFACE_BOUND_TOLERANCE: f64 = 1e-6;
 
     #[test]
     fn planar_line_offset_realizes_as_curve_without_mutating_source() {
@@ -40,8 +41,14 @@ mod tests {
     fn planar_surface_offset_realizes_as_one_surface_face() {
         let b=OcctBackend::new();
         let source=PlanarSurfacePatch3D { origin:umlcad_v6_offset_api::Point3{x:1.,y:2.,z:3.}, u_dir:umlcad_v6_offset_api::Point3{x:1.,y:0.,z:0.}, v_dir:umlcad_v6_offset_api::Point3{x:0.,y:1.,z:0.}, width:5., height:8. };
-        let result=b.offset_planar_surface(source,4.,T).unwrap(); let counts=b.topology_counts(&result.shape,T).unwrap();
-        assert_eq!(result.kind,GeometryKind::Surface); assert_eq!(counts.faces,1); assert_eq!(counts.solids,0); assert_eq!(b.bounding_box(&result.shape,T).unwrap().min_z,7.);
+        let result=b.offset_planar_surface(source,4.,T).unwrap(); let counts=b.topology_counts(&result.shape,T).unwrap(); let bounds=b.bounding_box(&result.shape,T).unwrap();
+        assert_eq!(result.kind,GeometryKind::Surface); assert_eq!(counts.faces,1); assert_eq!(counts.solids,0);
+        assert!((bounds.min_x-1.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        assert!((bounds.max_x-6.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        assert!((bounds.min_y-2.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        assert!((bounds.max_y-10.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        assert!((bounds.min_z-7.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        assert!((bounds.max_z-7.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
     }
 
     #[test]
