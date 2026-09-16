@@ -29,14 +29,10 @@ extern "C" int32_t umlcad_occt_sweep_linear_circular(
     const double dz = end_z - start_z;
     const double length = std::sqrt(dx * dx + dy * dy + dz * dz);
     if (!std::isfinite(length) || length <= 0.0) return UMLCAD_OCCT_INVALID_ARGUMENT;
-    const double direction_norm = length;
-    const double nx = normal_x;
-    const double ny = normal_y;
-    const double nz = normal_z;
-    const double normal_norm = std::sqrt(nx * nx + ny * ny + nz * nz);
+    const double normal_norm = std::sqrt(normal_x * normal_x + normal_y * normal_y + normal_z * normal_z);
     if (!std::isfinite(normal_norm) || normal_norm <= 0.0) return UMLCAD_OCCT_INVALID_ARGUMENT;
-    const double orthogonality = std::abs((nx * dx + ny * dy + nz * dz) / (normal_norm * direction_norm));
-    if (!std::isfinite(orthogonality) || orthogonality > 1e-9) return UMLCAD_OCCT_INVALID_ARGUMENT;
+    const double alignment = std::abs((normal_x * dx + normal_y * dy + normal_z * dz) / (normal_norm * length));
+    if (!std::isfinite(alignment) || 1.0 - alignment > 1e-9) return UMLCAD_OCCT_INVALID_ARGUMENT;
     try {
         const gp_Pnt origin(start_x, start_y, start_z);
         const gp_Dir direction(dx, dy, dz);
