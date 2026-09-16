@@ -1,23 +1,69 @@
-use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryResult, ToleranceContext};
-use umlcad_v6_offset_api::{OffsetBackend, PlanarLineSegment3D, PlanarSurfacePatch3D};
-use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceBackend, Point3 as NurbsPoint3};
 use crate::OcctBackend;
+use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryResult, ToleranceContext};
+use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceBackend, Point3 as NurbsPoint3};
+use umlcad_v6_offset_api::{OffsetBackend, PlanarLineSegment3D, PlanarSurfacePatch3D};
 
 impl OffsetBackend for OcctBackend {
-    fn offset_planar_line(&self, definition: PlanarLineSegment3D, distance: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError> {
+    fn offset_planar_line(
+        &self,
+        definition: PlanarLineSegment3D,
+        distance: f64,
+        tolerance: ToleranceContext,
+    ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
         let result = definition.offset(distance, tolerance)?;
-        self.line_curve(result.start.x, result.start.y, result.start.z, result.end.x, result.end.y, result.end.z, tolerance)
+        self.line_curve(
+            result.start.x,
+            result.start.y,
+            result.start.z,
+            result.end.x,
+            result.end.y,
+            result.end.z,
+            tolerance,
+        )
     }
 
-    fn offset_planar_surface(&self, definition: PlanarSurfacePatch3D, distance: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError> {
+    fn offset_planar_surface(
+        &self,
+        definition: PlanarSurfacePatch3D,
+        distance: f64,
+        tolerance: ToleranceContext,
+    ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
         let result = definition.offset(distance, tolerance)?;
         let u = result.u_dir.scale(result.width);
         let v = result.v_dir.scale(result.height);
-        let p00 = result.origin; let p01 = result.origin.add(v); let p10 = result.origin.add(u); let p11 = p10.add(v);
-        let surface = NurbsSurface3DDefinition::new((1,1), vec![
-            NurbsPoint3 { x:p00.x,y:p00.y,z:p00.z }, NurbsPoint3 { x:p01.x,y:p01.y,z:p01.z },
-            NurbsPoint3 { x:p10.x,y:p10.y,z:p10.z }, NurbsPoint3 { x:p11.x,y:p11.y,z:p11.z },
-        ], vec![1.0;4], (2,2), vec![0.,0.,1.,1.], vec![0.,0.,1.,1.]);
+        let p00 = result.origin;
+        let p01 = result.origin.add_point(v);
+        let p10 = result.origin.add_point(u);
+        let p11 = p10.add_point(v);
+        let surface = NurbsSurface3DDefinition::new(
+            (1, 1),
+            vec![
+                NurbsPoint3 {
+                    x: p00.x,
+                    y: p00.y,
+                    z: p00.z,
+                },
+                NurbsPoint3 {
+                    x: p01.x,
+                    y: p01.y,
+                    z: p01.z,
+                },
+                NurbsPoint3 {
+                    x: p10.x,
+                    y: p10.y,
+                    z: p10.z,
+                },
+                NurbsPoint3 {
+                    x: p11.x,
+                    y: p11.y,
+                    z: p11.z,
+                },
+            ],
+            vec![1.0; 4],
+            (2, 2),
+            vec![0.0, 0.0, 1.0, 1.0],
+            vec![0.0, 0.0, 1.0, 1.0],
+        );
         self.nurbs_surface3d(&surface, tolerance)
     }
 }
@@ -26,35 +72,107 @@ impl OffsetBackend for OcctBackend {
 mod tests {
     use super::*;
     use umlcad_v6_geometry_api::{GeometryBackend, GeometryKind};
-    const T: ToleranceContext = ToleranceContext { modeling:1e-9, validation:1e-9 };
+
+    const T: ToleranceContext = ToleranceContext {
+        modeling: 1e-9,
+        validation: 1e-9,
+    };
     const OCCT_PLANAR_SURFACE_BOUND_TOLERANCE: f64 = 1e-6;
 
     #[test]
     fn planar_line_offset_realizes_as_curve_without_mutating_source() {
-        let b=OcctBackend::new();
-        let source=PlanarLineSegment3D { start:umlcad_v6_offset_api::Point3{x:0.,y:0.,z:0.}, end:umlcad_v6_offset_api::Point3{x:10.,y:0.,z:0.}, plane_normal:umlcad_v6_offset_api::Point3{x:0.,y:0.,z:1.} };
-        let result=b.offset_planar_line(source,2.,T).unwrap();
-        assert_eq!(result.kind,GeometryKind::Curve); assert_eq!(b.curve_length(&result.shape,T).unwrap(),10.); assert_eq!(source.start,umlcad_v6_offset_api::Point3{x:0.,y:0.,z:0.});
+        let b = OcctBackend::new();
+        let source = PlanarLineSegment3D {
+            start: umlcad_v6_offset_api::Point3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            end: umlcad_v6_offset_api::Point3 {
+                x: 10.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            plane_normal: umlcad_v6_offset_api::Point3 {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            },
+        };
+        let result = b.offset_planar_line(source, 2.0, T).unwrap();
+        assert_eq!(result.kind, GeometryKind::Curve);
+        assert_eq!(b.curve_length(&result.shape, T).unwrap(), 10.0);
+        assert_eq!(
+            source.start,
+            umlcad_v6_offset_api::Point3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0
+            }
+        );
     }
 
     #[test]
     fn planar_surface_offset_realizes_as_one_surface_face() {
-        let b=OcctBackend::new();
-        let source=PlanarSurfacePatch3D { origin:umlcad_v6_offset_api::Point3{x:1.,y:2.,z:3.}, u_dir:umlcad_v6_offset_api::Point3{x:1.,y:0.,z:0.}, v_dir:umlcad_v6_offset_api::Point3{x:0.,y:1.,z:0.}, width:5., height:8. };
-        let result=b.offset_planar_surface(source,4.,T).unwrap(); let counts=b.topology_counts(&result.shape,T).unwrap(); let bounds=b.bounding_box(&result.shape,T).unwrap();
-        assert_eq!(result.kind,GeometryKind::Surface); assert_eq!(counts.faces,1); assert_eq!(counts.solids,0);
-        assert!((bounds.min_x-1.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
-        assert!((bounds.max_x-6.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
-        assert!((bounds.min_y-2.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
-        assert!((bounds.max_y-10.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
-        assert!((bounds.min_z-7.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
-        assert!((bounds.max_z-7.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        let b = OcctBackend::new();
+        let source = PlanarSurfacePatch3D {
+            origin: umlcad_v6_offset_api::Point3 {
+                x: 1.0,
+                y: 2.0,
+                z: 3.0,
+            },
+            u_dir: umlcad_v6_offset_api::Point3 {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            v_dir: umlcad_v6_offset_api::Point3 {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+            },
+            width: 5.0,
+            height: 8.0,
+        };
+        let result = b.offset_planar_surface(source, 4.0, T).unwrap();
+        let counts = b.topology_counts(&result.shape, T).unwrap();
+        let bounds = b.bounding_box(&result.shape, T).unwrap();
+        assert_eq!(result.kind, GeometryKind::Surface);
+        assert_eq!(counts.faces, 1);
+        assert_eq!(counts.solids, 0);
+        assert!((bounds.min_x - 1.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        assert!((bounds.max_x - 6.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        assert!((bounds.min_y - 2.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        assert!((bounds.max_y - 10.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        assert!((bounds.min_z - 7.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
+        assert!((bounds.max_z - 7.0).abs() <= OCCT_PLANAR_SURFACE_BOUND_TOLERANCE);
     }
 
     #[test]
     fn invalid_source_is_rejected_before_native_construction() {
-        let b=OcctBackend::new();
-        let source=PlanarLineSegment3D { start:umlcad_v6_offset_api::Point3{x:0.,y:0.,z:0.}, end:umlcad_v6_offset_api::Point3{x:0.,y:0.,z:0.}, plane_normal:umlcad_v6_offset_api::Point3{x:0.,y:0.,z:1.} };
-        assert!(matches!(b.offset_planar_line(source,1.,T),Err(GeometryError::InvalidInput("planar line offset requires a non-degenerate segment"))));
+        let b = OcctBackend::new();
+        let source = PlanarLineSegment3D {
+            start: umlcad_v6_offset_api::Point3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            end: umlcad_v6_offset_api::Point3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            plane_normal: umlcad_v6_offset_api::Point3 {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            },
+        };
+        assert!(matches!(
+            b.offset_planar_line(source, 1.0, T),
+            Err(GeometryError::InvalidInput(
+                "planar line offset requires a non-degenerate segment"
+            ))
+        ));
     }
 }
