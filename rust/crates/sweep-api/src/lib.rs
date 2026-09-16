@@ -73,8 +73,8 @@ impl LinearCircularSweep {
         }
         let path_unit = path.normalized()?;
         let normal_unit = self.profile.normal.normalized()?;
-        if normal_unit.dot(path_unit).abs() > tolerance.validation {
-            return Err(GeometryError::InvalidInput("sweep profile plane must be perpendicular to the linear path"));
+        if (1.0 - normal_unit.dot(path_unit).abs()) > tolerance.validation {
+            return Err(GeometryError::InvalidInput("sweep profile normal must be parallel to the linear path"));
         }
         let center_delta = self.profile.center.sub(self.path.start).norm();
         if center_delta > tolerance.validation {
@@ -156,6 +156,13 @@ mod tests {
     }
 
     #[test]
+    fn linear_circular_sweep_accepts_antiparallel_profile_normal() {
+        let mut value = sweep();
+        value.profile.normal = Point3 { x: 0.0, y: 0.0, z: -1.0 };
+        assert!(value.validate(tolerance()).is_ok());
+    }
+
+    #[test]
     fn linear_sweep_alignment_handles_parallel_and_antiparallel_paths() {
         let mut value = sweep();
         let (axis, angle) = value.alignment_to_z(tolerance()).unwrap();
@@ -163,7 +170,7 @@ mod tests {
         assert_eq!(angle, 0.0);
 
         value.path.end = Point3 { x: 0.0, y: 0.0, z: -10.0 };
-        value.profile.normal = Point3 { x: 0.0, y: 0.0, z: 1.0 };
+        value.profile.normal = Point3 { x: 0.0, y: 0.0, z: -1.0 };
         let (axis, angle) = value.alignment_to_z(tolerance()).unwrap();
         assert_eq!(axis, Point3 { x: 1.0, y: 0.0, z: 0.0 });
         assert_eq!(angle, std::f64::consts::PI);
@@ -173,6 +180,7 @@ mod tests {
     fn linear_sweep_alignment_is_finite_for_general_direction() {
         let mut value = sweep();
         value.path.end = Point3 { x: 3.0, y: 4.0, z: 12.0 };
+        value.profile.normal = Point3 { x: 3.0, y: 4.0, z: 12.0 };
         let (axis, angle) = value.alignment_to_z(tolerance()).unwrap();
         assert!(axis.finite());
         assert!(angle.is_finite());
@@ -180,10 +188,10 @@ mod tests {
     }
 
     #[test]
-    fn sweep_rejects_non_perpendicular_profile_plane() {
+    fn sweep_rejects_misaligned_profile_normal() {
         let mut value = sweep();
-        value.profile.normal = Point3 { x: 1.0, y: 0.0, z: 1.0 };
-        assert_eq!(value.validate(tolerance()), Err(GeometryError::InvalidInput("sweep profile plane must be perpendicular to the linear path")));
+        value.profile.normal = Point3 { x: 1.0, y: 0.0, z: 0.0 };
+        assert_eq!(value.validate(tolerance()), Err(GeometryError::InvalidInput("sweep profile normal must be parallel to the linear path")));
     }
 
     #[test]
