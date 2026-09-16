@@ -50,11 +50,15 @@ S12 scope boundary:
 
 **S12 exit gate:** satisfied by the authoritative full CI matrix on PR #44: workspace debug/release tests, format, Clippy, kernel format/tests, and kernel Clippy gates all green, with semantic/native conformance tests passing.
 
+### S13 — Offsets and healing — IN PROGRESS
+
+The first bounded S13 slice establishes exact backend-neutral offsets for oriented planar line segments and planar rectangular surface patches, with OCCT realization and independent conformance tests. General NURBS offsets, self-intersection/trimming, corner joining, shell/thickness, and generic healing remain explicitly unimplemented.
+
+The healing contract requires explicit defect classes, permitted changes, tolerance budget, invariants, repair evidence, and failure/unsupported outcomes. A generic backend `make valid` result is not accepted as UMLCAD healing authority.
+
+See `docs/S13_OFFSET_HEALING_CONTRACT.md`.
+
 ## Following stations
-
-### S13 — Offsets and healing
-
-Implement offset curves/surfaces and controlled healing with explicit repair rules, error evidence, and no silent change of engineering intent.
 
 ### S14 — Freeform feature generation
 
