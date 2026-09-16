@@ -17,6 +17,13 @@ impl Point3 {
     fn dot(self, other: Self) -> f64 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
+    fn cross(self, other: Self) -> Self {
+        Self {
+            x: self.y * other.z - self.z * other.y,
+            y: self.z * other.x - self.x * other.z,
+            z: self.x * other.y - self.y * other.x,
+        }
+    }
     fn norm(self) -> f64 {
         self.dot(self).sqrt()
     }
@@ -85,6 +92,30 @@ impl LinearCircularSweep {
         let length = self.length(tolerance)?;
         Ok(std::f64::consts::PI * self.profile.radius * self.profile.radius * length)
     }
+
+    fn alignment_to_z(self, tolerance: ToleranceContext) -> Result<(Point3, f64), GeometryError> {
+        self.validate(tolerance)?;
+        let direction = self.path.end.sub(self.path.start).normalized()?;
+        let z_axis = Point3 { x: 0.0, y: 0.0, z: 1.0 };
+        let dot = direction.dot(z_axis).clamp(-1.0, 1.0);
+        if dot >= 1.0 - tolerance.validation {
+            return Ok((Point3 { x: 1.0, y: 0.0, z: 0.0 }, 0.0));
+        }
+        if dot <= -1.0 + tolerance.validation {
+            return Ok((Point3 { x: 1.0, y: 0.0, z: 0.0 }, std::f64::consts::PI));
+        }
+        let axis = z_axis.cross(direction).normalized()?;
+        Ok((axis, dot.acos()))
+    }
+
+    pub fn realize_with<B: GeometryBackend>(self, backend: &B, tolerance: ToleranceContext) -> Result<GeometryResult<B::Shape>, GeometryError> {
+        self.validate(tolerance)?;
+        let length = self.path.end.sub(self.path.start).norm();
+        let base = backend.cylinder_solid(self.profile.radius, length, tolerance)?.shape;
+        let (axis, angle) = self.alignment_to_z(tolerance)?;
+        let rotated = backend.rotate(&base, axis.x, axis.y, axis.z, angle, tolerance)?.shape;
+        backend.translate(&rotated, self.path.start.x, self.path.start.y, self.path.start.z, tolerance)
+    }
 }
 
 pub trait SweepBackend: GeometryBackend {
@@ -122,6 +153,30 @@ mod tests {
         let value = sweep();
         assert_eq!(value.length(tolerance()).unwrap(), 10.0);
         assert!((value.volume(tolerance()).unwrap() - 40.0 * std::f64::consts::PI).abs() < 1e-12);
+    }
+
+    #[test]
+    fn linear_sweep_alignment_handles_parallel_and_antiparallel_paths() {
+        let mut value = sweep();
+        let (axis, angle) = value.alignment_to_z(tolerance()).unwrap();
+        assert_eq!(axis, Point3 { x: 1.0, y: 0.0, z: 0.0 });
+        assert_eq!(angle, 0.0);
+
+        value.path.end = Point3 { x: 0.0, y: 0.0, z: -10.0 };
+        value.profile.normal = Point3 { x: 0.0, y: 0.0, z: 1.0 };
+        let (axis, angle) = value.alignment_to_z(tolerance()).unwrap();
+        assert_eq!(axis, Point3 { x: 1.0, y: 0.0, z: 0.0 });
+        assert_eq!(angle, std::f64::consts::PI);
+    }
+
+    #[test]
+    fn linear_sweep_alignment_is_finite_for_general_direction() {
+        let mut value = sweep();
+        value.path.end = Point3 { x: 3.0, y: 4.0, z: 12.0 };
+        let (axis, angle) = value.alignment_to_z(tolerance()).unwrap();
+        assert!(axis.finite());
+        assert!(angle.is_finite());
+        assert!((axis.norm() - 1.0).abs() < 1e-12);
     }
 
     #[test]
