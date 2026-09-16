@@ -29,7 +29,7 @@ OCCT is a realization backend. It does not define the semantic result.
 - a strictly positive radius above the UMLCAD modeling tolerance;
 - a finite non-degenerate linear path;
 - profile center coincident with path start;
-- profile normal perpendicular to the path tangent.
+- profile normal parallel or anti-parallel to the path tangent, so the circular profile plane is perpendicular to the path.
 
 The exact geometric result is the Minkowski sweep of the circular disk along the line segment. For a straight path this is a right circular cylinder with:
 
@@ -38,7 +38,7 @@ length = |path.end - path.start|
 volume = π r² length
 ```
 
-The profile normal selects the profile plane but does not change the geometry of an ideal circle when reversed.
+The profile normal selects the profile plane; reversing that normal does not change the geometry of an ideal circular profile.
 
 ## 3. Failure semantics
 
@@ -49,7 +49,7 @@ The semantic layer rejects:
 - radius at or below modeling tolerance;
 - a zero/degenerate path;
 - a zero/degenerate profile normal;
-- a profile plane that is not perpendicular to the path within validation tolerance;
+- a profile normal that is not parallel or anti-parallel to the path tangent within validation tolerance;
 - a profile center that is not coincident with path start within validation tolerance.
 
 These are contract failures, not requests to relax tolerance.
@@ -58,7 +58,7 @@ These are contract failures, not requests to relax tolerance.
 
 The OCCT reference backend realizes the bounded slice through an explicit native bridge. The native operation constructs an equivalent cylinder aligned to the requested path, preserving the exact straight-path sweep geometry while remaining behind the opaque backend boundary.
 
-The backend validates the UMLCAD definition before entering the native bridge.
+The backend validates the UMLCAD definition before entering the native bridge. The native normal check is defensive and mirrors the backend-neutral contract; it is not an independent semantic authority.
 
 ## 5. Required evidence
 
@@ -76,7 +76,7 @@ The source definition is immutable and repeated evaluation must not mutate it.
 
 This slice does not claim:
 
-- arbitrary multi-segment sweep paths;
+- arbitrary multi-segment or curved sweep paths;
 - path curvature/continuity management;
 - profile orientation transport along curved paths;
 - variable-radius sweeps;
