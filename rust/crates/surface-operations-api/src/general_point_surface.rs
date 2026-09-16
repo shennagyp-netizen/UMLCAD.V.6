@@ -55,6 +55,16 @@ fn map_error(error: NurbsSurfaceEvaluationError) -> GeneralPointSurfaceClosestPo
     }
 }
 
+fn kkt_stationary(g: f64, parameter: f64, lower: f64, upper: f64, tolerance: f64) -> bool {
+    if (parameter - lower).abs() <= tolerance {
+        g >= -tolerance
+    } else if (parameter - upper).abs() <= tolerance {
+        g <= tolerance
+    } else {
+        g.abs() <= tolerance
+    }
+}
+
 pub fn closest_point_on_nurbs_surface(
     point: Point3,
     surface: &NurbsSurface3DDefinition,
@@ -113,8 +123,15 @@ pub fn closest_point_on_nurbs_surface(
             }
             let g0 = dot(d.du, r);
             let g1 = dot(d.dv, r);
-            let grad_norm = g0.hypot(g1);
-            if grad_norm <= residual_tol.max(1e-12 * scale) && norm(r) <= residual_tol {
+            let gradient_tol = residual_tol.max(1e-12 * scale);
+            if kkt_stationary(g0, u, u0, u1, param_tol_u) && kkt_stationary(g1, v, v0, v1, param_tol_v) {
+                let point_distance = norm(r);
+                if point_distance.is_finite() {
+                    converged = true;
+                    break;
+                }
+            }
+            if g0.abs().max(g1.abs()) <= gradient_tol {
                 converged = true;
                 break;
             }
@@ -155,7 +172,10 @@ pub fn closest_point_on_nurbs_surface(
                 if accepted {
                     let d = surface.differential_at(u, v).map_err(map_error)?;
                     let r = sub(d.point, point);
-                    if norm(r) <= residual_tol || dot(d.du, r).hypot(dot(d.dv, r)) <= residual_tol.max(1e-12 * scale) {
+                    if norm(r).is_finite()
+                        && (kkt_stationary(dot(d.du, r), u, u0, u1, param_tol_u)
+                            && kkt_stationary(dot(d.dv, r), v, v0, v1, param_tol_v))
+                    {
                         converged = true;
                     }
                 }
