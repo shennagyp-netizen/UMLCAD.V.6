@@ -2,6 +2,7 @@ use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceEvaluati
 
 mod curve_split;
 mod curve_surface;
+mod general_surface_intersection;
 mod planar_line_surface;
 mod planar_nurbs_relation;
 mod point_surface;
@@ -11,6 +12,7 @@ pub use curve_surface::{
     intersect_nurbs_curve_surface, CurveSurfaceIntersectionError, CurveSurfaceIntersectionPoint,
     CurveSurfaceIntersectionResult, NurbsCurveSurfaceOperations,
 };
+pub use general_surface_intersection::intersect_nurbs_surfaces;
 pub use planar_nurbs_relation::{
     classify_planar_nurbs_surface_relation, PlanarNurbsSurfaceRelation,
     PlanarNurbsSurfaceRelationError, Plane3D,
