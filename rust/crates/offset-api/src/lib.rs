@@ -37,7 +37,10 @@ impl PlanarLineSegment3D {
         let normal = self.plane_normal.normalized("planar line offset requires a non-zero plane normal")?;
         let offset_direction = normal.cross(tangent).normalized("declared offset plane is incompatible with the line tangent")?;
         let translation = offset_direction.scale(distance);
-        Ok(Self { start: self.start.add(translation), end: self.end.add(translation), plane_normal: self.plane_normal })
+        let start = self.start.add(translation);
+        let end = self.end.add(translation);
+        if !start.finite() || !end.finite() { return Err(GeometryError::InvalidInput("line offset result is not finite")); }
+        Ok(Self { start, end, plane_normal: self.plane_normal })
     }
 }
 
@@ -47,15 +50,22 @@ impl PlanarSurfacePatch3D {
         if !self.origin.finite() || !self.u_dir.finite() || !self.v_dir.finite() { return Err(GeometryError::InvalidInput("planar surface offset contains non-finite values")); }
         if !self.width.is_finite() || !self.height.is_finite() || self.width <= 0.0 || self.height <= 0.0 { return Err(GeometryError::InvalidInput("planar surface patch dimensions must be finite and positive")); }
         let u_norm = self.u_dir.norm(); let v_norm = self.v_dir.norm();
-        if !u_norm.is_finite() || u_norm == 0.0 { return Err(GeometryError::InvalidInput("planar surface requires a non-zero U direction")); }
-        if !v_norm.is_finite() || v_norm == 0.0 { return Err(GeometryError::InvalidInput("planar surface requires a non-zero V direction")); }
+        if !u_norm.is_finite() || u_norm <= tolerance.modeling { return Err(GeometryError::InvalidInput("planar surface requires a non-zero U direction")); }
+        if !v_norm.is_finite() || v_norm <= tolerance.modeling { return Err(GeometryError::InvalidInput("planar surface requires a non-zero V direction")); }
         if (u_norm - 1.0).abs() > tolerance.validation || (v_norm - 1.0).abs() > tolerance.validation { return Err(GeometryError::InvalidInput("planar surface directions must be unit vectors")); }
         if self.u_dir.dot(self.v_dir).abs() > tolerance.validation { return Err(GeometryError::InvalidInput("planar surface directions must be orthogonal")); }
         if self.u_dir.cross(self.v_dir).norm() <= tolerance.modeling { return Err(GeometryError::InvalidInput("planar surface directions must define a plane")); }
         Ok(())
     }
     pub fn normal(self, tolerance: ToleranceContext) -> Result<Point3, GeometryError> { self.validate(tolerance)?; self.u_dir.cross(self.v_dir).normalized("planar surface requires a valid normal") }
-    pub fn offset(self, distance: f64, tolerance: ToleranceContext) -> Result<Self, GeometryError> { self.validate(tolerance)?; if !distance.is_finite() { return Err(GeometryError::InvalidInput("surface offset distance must be finite")); } let normal = self.normal(tolerance)?; Ok(Self { origin: self.origin.add(normal.scale(distance)), ..self }) }
+    pub fn offset(self, distance: f64, tolerance: ToleranceContext) -> Result<Self, GeometryError> {
+        self.validate(tolerance)?;
+        if !distance.is_finite() { return Err(GeometryError::InvalidInput("surface offset distance must be finite")); }
+        let normal = self.normal(tolerance)?;
+        let origin = self.origin.add(normal.scale(distance));
+        if !origin.finite() { return Err(GeometryError::InvalidInput("surface offset result is not finite")); }
+        Ok(Self { origin, ..self })
+    }
 }
 
 pub trait OffsetBackend: GeometryBackend {
@@ -71,8 +81,10 @@ mod tests {
     #[test] fn negative_line_offset_reverses_the_declared_side() { let line=PlanarLineSegment3D{start:Point3{x:0.,y:0.,z:0.},end:Point3{x:0.,y:5.,z:0.},plane_normal:Point3{x:0.,y:0.,z:1.}}; let result=line.offset(-3.,tolerance()).unwrap(); assert_eq!(result.start,Point3{x:-3.,y:0.,z:0.}); assert_eq!(result.end,Point3{x:-3.,y:5.,z:0.}); }
     #[test] fn zero_distance_is_exact_identity() { let line=PlanarLineSegment3D{start:Point3{x:-2.,y:3.,z:4.},end:Point3{x:7.,y:-1.,z:4.},plane_normal:Point3{x:0.,y:0.,z:2.}}; assert_eq!(line.offset(0.,tolerance()).unwrap(),line); }
     #[test] fn line_offset_rejects_non_planar_tangent() { let line=PlanarLineSegment3D{start:Point3{x:0.,y:0.,z:0.},end:Point3{x:1.,y:0.,z:1.},plane_normal:Point3{x:0.,y:0.,z:1.}}; assert_eq!(line.validate(tolerance()),Err(GeometryError::InvalidInput("line tangent must lie in the declared offset plane"))); }
+    #[test] fn line_offset_rejects_nonfinite_result() { let line=PlanarLineSegment3D{start:Point3{x:f64::MAX,y:0.,z:0.},end:Point3{x:f64::MAX,y:1.,z:0.},plane_normal:Point3{x:0.,y:0.,z:1.}}; assert_eq!(line.offset(f64::MAX,tolerance()),Err(GeometryError::InvalidInput("line offset result is not finite"))); }
     #[test] fn surface_offset_translates_exactly_along_the_oriented_normal() { let patch=PlanarSurfacePatch3D{origin:Point3{x:1.,y:2.,z:3.},u_dir:Point3{x:1.,y:0.,z:0.},v_dir:Point3{x:0.,y:1.,z:0.},width:5.,height:8.}; let result=patch.offset(4.,tolerance()).unwrap(); assert_eq!(result.origin,Point3{x:1.,y:2.,z:7.}); }
     #[test] fn negative_surface_offset_uses_the_inverse_normal() { let patch=PlanarSurfacePatch3D{origin:Point3{x:0.,y:0.,z:10.},u_dir:Point3{x:0.,y:1.,z:0.},v_dir:Point3{x:1.,y:0.,z:0.},width:2.,height:3.}; let result=patch.offset(-2.,tolerance()).unwrap(); assert_eq!(result.origin,Point3{x:0.,y:0.,z:12.}); }
     #[test] fn surface_offset_rejects_non_orthogonal_parameter_directions() { let patch=PlanarSurfacePatch3D{origin:Point3{x:0.,y:0.,z:0.},u_dir:Point3{x:1.,y:0.,z:0.},v_dir:Point3{x:1.,y:1.,z:0.},width:1.,height:1.}; assert_eq!(patch.validate(tolerance()),Err(GeometryError::InvalidInput("planar surface directions must be orthogonal"))); }
     #[test] fn surface_offset_rejects_non_unit_parameter_directions() { let patch=PlanarSurfacePatch3D{origin:Point3{x:0.,y:0.,z:0.},u_dir:Point3{x:2.,y:0.,z:0.},v_dir:Point3{x:0.,y:1.,z:0.},width:1.,height:1.}; assert_eq!(patch.validate(tolerance()),Err(GeometryError::InvalidInput("planar surface directions must be unit vectors"))); }
+    #[test] fn surface_offset_rejects_nonfinite_result() { let patch=PlanarSurfacePatch3D{origin:Point3{x:f64::MAX,y:0.,z:0.},u_dir:Point3{x:0.,y:1.,z:0.},v_dir:Point3{x:0.,y:0.,z:1.},width:1.,height:1.}; assert_eq!(patch.offset(f64::MAX,tolerance()),Err(GeometryError::InvalidInput("surface offset result is not finite"))); }
 }
