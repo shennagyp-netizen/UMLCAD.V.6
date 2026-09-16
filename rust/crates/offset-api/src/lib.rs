@@ -3,8 +3,8 @@ use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryResult, Tol
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point3 { pub x: f64, pub y: f64, pub z: f64 }
 impl Point3 {
-    pub fn sub(self, other: Self) -> Self { Self { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z } }
-    pub fn add(self, other: Self) -> Self { Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z } }
+    pub fn sub_point(self, other: Self) -> Self { Self { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z } }
+    pub fn add_point(self, other: Self) -> Self { Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z } }
     pub fn scale(self, factor: f64) -> Self { Self { x: self.x * factor, y: self.y * factor, z: self.z * factor } }
     pub fn dot(self, other: Self) -> f64 { self.x * other.x + self.y * other.y + self.z * other.z }
     pub fn cross(self, other: Self) -> Self { Self { x: self.y * other.z - self.z * other.y, y: self.z * other.x - self.x * other.z, z: self.x * other.y - self.y * other.x } }
@@ -22,7 +22,7 @@ impl PlanarLineSegment3D {
     pub fn validate(self, tolerance: ToleranceContext) -> Result<(), GeometryError> {
         tolerance.validate()?;
         if !self.start.finite() || !self.end.finite() || !self.plane_normal.finite() { return Err(GeometryError::InvalidInput("planar line offset contains non-finite values")); }
-        let tangent = self.end.sub(self.start);
+        let tangent = self.end.sub_point(self.start);
         if tangent.norm() <= tolerance.modeling { return Err(GeometryError::InvalidInput("planar line offset requires a non-degenerate segment")); }
         if self.plane_normal.norm() <= tolerance.modeling { return Err(GeometryError::InvalidInput("planar line offset requires a non-zero plane normal")); }
         let normal = self.plane_normal.normalized("planar line offset requires a non-zero plane normal")?;
@@ -33,12 +33,12 @@ impl PlanarLineSegment3D {
     pub fn offset(self, distance: f64, tolerance: ToleranceContext) -> Result<Self, GeometryError> {
         self.validate(tolerance)?;
         if !distance.is_finite() { return Err(GeometryError::InvalidInput("line offset distance must be finite")); }
-        let tangent = self.end.sub(self.start).normalized("planar line offset requires a non-degenerate segment")?;
+        let tangent = self.end.sub_point(self.start).normalized("planar line offset requires a non-degenerate segment")?;
         let normal = self.plane_normal.normalized("planar line offset requires a non-zero plane normal")?;
         let offset_direction = normal.cross(tangent).normalized("declared offset plane is incompatible with the line tangent")?;
         let translation = offset_direction.scale(distance);
-        let start = self.start.add(translation);
-        let end = self.end.add(translation);
+        let start = self.start.add_point(translation);
+        let end = self.end.add_point(translation);
         if !start.finite() || !end.finite() { return Err(GeometryError::InvalidInput("line offset result is not finite")); }
         Ok(Self { start, end, plane_normal: self.plane_normal })
     }
@@ -62,7 +62,7 @@ impl PlanarSurfacePatch3D {
         self.validate(tolerance)?;
         if !distance.is_finite() { return Err(GeometryError::InvalidInput("surface offset distance must be finite")); }
         let normal = self.normal(tolerance)?;
-        let origin = self.origin.add(normal.scale(distance));
+        let origin = self.origin.add_point(normal.scale(distance));
         if !origin.finite() { return Err(GeometryError::InvalidInput("surface offset result is not finite")); }
         Ok(Self { origin, ..self })
     }
