@@ -20,8 +20,10 @@ pub use point_surface::{
     PointSurfaceClosestPointError, PointSurfaceClosestPointResult, PointSurfaceOperations,
 };
 pub use surface_surface::{
-    intersect_planar_nurbs_surfaces, SurfaceIntersectionEndpoint, SurfaceIntersectionSegment,
-    SurfaceSurfaceIntersectionError, SurfaceSurfaceIntersectionResult, SurfaceSurfaceOperations,
+    classify_nurbs_surface_pair_relation, intersect_planar_nurbs_surfaces,
+    NurbsSurfacePairRelation, NurbsSurfacePairRelationError, SurfaceIntersectionEndpoint,
+    SurfaceIntersectionSegment, SurfaceSurfaceIntersectionError, SurfaceSurfaceIntersectionResult,
+    SurfaceSurfaceOperations,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
