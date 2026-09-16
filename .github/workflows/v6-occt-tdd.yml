@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - v6-occt-tdd
+      - v6-s13-offsets
   pull_request:
     branches:
       - main

@@ -6,6 +6,7 @@ members = [
     "crates/freeform-api",
     "crates/nurbs-surface-api",
     "crates/surface-operations-api",
+    "crates/offset-api",
     "crates/mesh-api",
     "crates/exchange-api",
     "crates/occt-backend",
