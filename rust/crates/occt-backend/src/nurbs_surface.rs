@@ -1,3 +1,6 @@
+#[path = "offsets.rs"]
+mod offsets;
+
 #[path = "trimmed_surface_backend.rs"]
 mod trimmed_surface_backend;
 
@@ -36,78 +39,21 @@ impl NurbsSurfaceDifferentialBackend for OcctBackend {
         if status != OCCT_OK { return Err(Self::status(status, "OCCT NURBS surface differential evaluation failed")); }
         if values.iter().any(|x| !x.is_finite()) { return Err(GeometryError::Unsupported("OCCT returned non-finite NURBS differential values")); }
         Ok(NurbsSurfaceDifferential {
-            point: Point3 { x: values[0], y: values[1], z: values[2] },
-            du: Point3 { x: values[3], y: values[4], z: values[5] },
-            dv: Point3 { x: values[6], y: values[7], z: values[8] },
-            duu: Point3 { x: values[9], y: values[10], z: values[11] },
-            duv: Point3 { x: values[12], y: values[13], z: values[14] },
-            dvv: Point3 { x: values[15], y: values[16], z: values[17] },
+            point: Point3 { x: values[0], y: values[1], z: values[2] }, du: Point3 { x: values[3], y: values[4], z: values[5] }, dv: Point3 { x: values[6], y: values[7], z: values[8] },
+            duu: Point3 { x: values[9], y: values[10], z: values[11] }, duv: Point3 { x: values[12], y: values[13], z: values[14] }, dvv: Point3 { x: values[15], y: values[16], z: values[17] },
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use umlcad_v6_geometry_api::GeometryBackend;
-
+    use super::*; use umlcad_v6_geometry_api::GeometryBackend;
     const TOLERANCE: ToleranceContext = ToleranceContext { modeling: 1e-9, validation: 1e-9 };
-
-    fn bilinear() -> NurbsSurface3DDefinition {
-        NurbsSurface3DDefinition::new((1, 1), vec![
-            Point3 { x: 0.0, y: 0.0, z: 0.0 }, Point3 { x: 0.0, y: 1.0, z: 1.0 },
-            Point3 { x: 1.0, y: 0.0, z: 1.0 }, Point3 { x: 1.0, y: 1.0, z: 2.0 },
-        ], vec![1.0; 4], (2, 2), vec![0.0, 0.0, 1.0, 1.0], vec![0.0, 0.0, 1.0, 1.0])
-    }
-
-    fn assert_close(a: Point3, b: Point3, tol: f64) {
-        assert!((a.x - b.x).abs() <= tol && (a.y - b.y).abs() <= tol && (a.z - b.z).abs() <= tol, "left={a:?} right={b:?}");
-    }
-
-    #[test]
-    fn bilinear_surface_is_a_valid_surface() {
-        let backend = OcctBackend::new();
-        let result = backend.nurbs_surface3d(&bilinear(), TOLERANCE).unwrap();
-        assert_eq!(result.kind, GeometryKind::Surface);
-        assert!(backend.validate(&result.shape, TOLERANCE).unwrap().valid);
-        assert_eq!(backend.topology_counts(&result.shape, TOLERANCE).unwrap().faces, 1);
-    }
-
-    #[test]
-    fn rational_surface_is_deterministic() {
-        let backend = OcctBackend::new(); let mut definition = bilinear(); definition.weights[3] = 2.0;
-        let first = backend.nurbs_surface3d(&definition, TOLERANCE).unwrap().shape;
-        let second = backend.nurbs_surface3d(&definition, TOLERANCE).unwrap().shape;
-        assert_eq!(backend.bounding_box(&first, TOLERANCE).unwrap(), backend.bounding_box(&second, TOLERANCE).unwrap());
-        assert_eq!(backend.topology_counts(&first, TOLERANCE).unwrap(), backend.topology_counts(&second, TOLERANCE).unwrap());
-    }
-
-    #[test]
-    fn invalid_surface_definition_fails_before_native_construction() {
-        let backend = OcctBackend::new(); let mut definition = bilinear(); definition.weights[0] = 0.0;
-        assert!(matches!(backend.nurbs_surface3d(&definition, TOLERANCE), Err(GeometryError::InvalidInput("invalid NURBS surface definition"))));
-    }
-
-    #[test]
-    fn native_differential_matches_exact_semantic_differential() {
-        let backend = OcctBackend::new();
-        let definition = bilinear();
-        let shape = backend.nurbs_surface3d(&definition, TOLERANCE).unwrap().shape;
-        let expected = definition.differential_at(0.25, 0.75).unwrap();
-        let actual = backend.nurbs_surface3d_differential_at(&shape, 0.25, 0.75, TOLERANCE).unwrap();
-        assert_close(actual.point, expected.point, 1e-11);
-        assert_close(actual.du, expected.du, 1e-11);
-        assert_close(actual.dv, expected.dv, 1e-11);
-        assert_close(actual.duu, expected.duu, 1e-11);
-        assert_close(actual.duv, expected.duv, 1e-11);
-        assert_close(actual.dvv, expected.dvv, 1e-11);
-        assert_close(actual.normal().unwrap(), expected.normal().unwrap(), 1e-11);
-    }
-
-    #[test]
-    fn native_differential_rejects_non_finite_parameters() {
-        let backend = OcctBackend::new();
-        let shape = backend.nurbs_surface3d(&bilinear(), TOLERANCE).unwrap().shape;
-        assert!(matches!(backend.nurbs_surface3d_differential_at(&shape, f64::NAN, 0.5, TOLERANCE), Err(GeometryError::InvalidInput(_))));
-    }
+    fn bilinear() -> NurbsSurface3DDefinition { NurbsSurface3DDefinition::new((1,1), vec![Point3{x:0.,y:0.,z:0.},Point3{x:0.,y:1.,z:1.},Point3{x:1.,y:0.,z:1.},Point3{x:1.,y:1.,z:2.}], vec![1.;4], (2,2), vec![0.,0.,1.,1.], vec![0.,0.,1.,1.]) }
+    fn assert_close(a: Point3,b: Point3,tol:f64){assert!((a.x-b.x).abs()<=tol&&(a.y-b.y).abs()<=tol&&(a.z-b.z).abs()<=tol,"left={a:?} right={b:?}");}
+    #[test] fn bilinear_surface_is_a_valid_surface(){let b=OcctBackend::new();let r=b.nurbs_surface3d(&bilinear(),TOLERANCE).unwrap();assert_eq!(r.kind,GeometryKind::Surface);assert!(b.validate(&r.shape,TOLERANCE).unwrap().valid);assert_eq!(b.topology_counts(&r.shape,TOLERANCE).unwrap().faces,1);}
+    #[test] fn rational_surface_is_deterministic(){let b=OcctBackend::new();let mut d=bilinear();d.weights[3]=2.;let a=b.nurbs_surface3d(&d,TOLERANCE).unwrap().shape;let c=b.nurbs_surface3d(&d,TOLERANCE).unwrap().shape;assert_eq!(b.bounding_box(&a,TOLERANCE).unwrap(),b.bounding_box(&c,TOLERANCE).unwrap());assert_eq!(b.topology_counts(&a,TOLERANCE).unwrap(),b.topology_counts(&c,TOLERANCE).unwrap());}
+    #[test] fn invalid_surface_definition_fails_before_native_construction(){let b=OcctBackend::new();let mut d=bilinear();d.weights[0]=0.;assert!(matches!(b.nurbs_surface3d(&d,TOLERANCE),Err(GeometryError::InvalidInput("invalid NURBS surface definition"))));}
+    #[test] fn native_differential_matches_exact_semantic_differential(){let b=OcctBackend::new();let d=bilinear();let s=b.nurbs_surface3d(&d,TOLERANCE).unwrap().shape;let e=d.differential_at(.25,.75).unwrap();let a=b.nurbs_surface3d_differential_at(&s,.25,.75,TOLERANCE).unwrap();assert_close(a.point,e.point,1e-11);assert_close(a.du,e.du,1e-11);assert_close(a.dv,e.dv,1e-11);assert_close(a.duu,e.duu,1e-11);assert_close(a.duv,e.duv,1e-11);assert_close(a.dvv,e.dvv,1e-11);assert_close(a.normal().unwrap(),e.normal().unwrap(),1e-11);}
+    #[test] fn native_differential_rejects_non_finite_parameters(){let b=OcctBackend::new();let s=b.nurbs_surface3d(&bilinear(),TOLERANCE).unwrap().shape;assert!(matches!(b.nurbs_surface3d_differential_at(&s,f64::NAN,.5,TOLERANCE),Err(GeometryError::InvalidInput(_))));}
 }
