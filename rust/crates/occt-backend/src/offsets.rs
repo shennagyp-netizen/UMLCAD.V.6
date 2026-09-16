@@ -2,6 +2,7 @@ use crate::OcctBackend;
 use umlcad_v6_geometry_api::{GeometryBackend, GeometryError, GeometryResult, ToleranceContext};
 use umlcad_v6_nurbs_surface_api::{NurbsSurface3DDefinition, NurbsSurfaceBackend, Point3 as NurbsPoint3};
 use umlcad_v6_offset_api::{OffsetBackend, PlanarLineSegment3D, PlanarSurfacePatch3D};
+use umlcad_v6_sweep_api::{LinearCircularSweep, SweepBackend};
 
 impl OffsetBackend for OcctBackend {
     fn offset_planar_line(
@@ -65,6 +66,16 @@ impl OffsetBackend for OcctBackend {
             vec![0.0, 0.0, 1.0, 1.0],
         );
         self.nurbs_surface3d(&surface, tolerance)
+    }
+}
+
+impl SweepBackend for OcctBackend {
+    fn sweep_linear_circular(
+        &self,
+        definition: LinearCircularSweep,
+        tolerance: ToleranceContext,
+    ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
+        definition.realize_with(self, tolerance)
     }
 }
 
@@ -174,5 +185,58 @@ mod tests {
                 "planar line offset requires a non-degenerate segment"
             ))
         ));
+    }
+
+    #[test]
+    fn linear_circular_sweep_realizes_as_one_valid_solid() {
+        let b = OcctBackend::new();
+        let definition = LinearCircularSweep {
+            profile: umlcad_v6_sweep_api::CircularProfile {
+                center: umlcad_v6_sweep_api::Point3 { x: 5.0, y: -2.0, z: 3.0 },
+                normal: umlcad_v6_sweep_api::Point3 { x: 0.0, y: 0.0, z: 1.0 },
+                radius: 2.0,
+            },
+            path: umlcad_v6_sweep_api::LinearPath {
+                start: umlcad_v6_sweep_api::Point3 { x: 5.0, y: -2.0, z: 3.0 },
+                end: umlcad_v6_sweep_api::Point3 { x: 5.0, y: -2.0, z: 13.0 },
+            },
+        };
+        let result = b.sweep_linear_circular(definition, T).unwrap();
+        assert_eq!(result.kind, GeometryKind::Solid);
+        let validation = b.validate(&result.shape, T).unwrap();
+        assert_eq!(validation.valid, true);
+        assert_eq!(validation.manifold, true);
+        let bounds = b.bounding_box(&result.shape, T).unwrap();
+        assert!((bounds.min_x - 3.0).abs() <= 1e-9);
+        assert!((bounds.max_x - 7.0).abs() <= 1e-9);
+        assert!((bounds.min_y + 4.0).abs() <= 1e-9);
+        assert!((bounds.max_y - 0.0).abs() <= 1e-9);
+        assert!((bounds.min_z - 3.0).abs() <= 1e-9);
+        assert!((bounds.max_z - 13.0).abs() <= 1e-9);
+        assert!((std::f64::consts::PI * 4.0 * 10.0 - definition.volume(T).unwrap()).abs() <= 1e-12);
+    }
+
+    #[test]
+    fn linear_circular_sweep_preserves_source_and_is_deterministic() {
+        let b = OcctBackend::new();
+        let definition = LinearCircularSweep {
+            profile: umlcad_v6_sweep_api::CircularProfile {
+                center: umlcad_v6_sweep_api::Point3 { x: 0.0, y: 0.0, z: 0.0 },
+                normal: umlcad_v6_sweep_api::Point3 { x: 0.0, y: 0.0, z: 1.0 },
+                radius: 1.5,
+            },
+            path: umlcad_v6_sweep_api::LinearPath {
+                start: umlcad_v6_sweep_api::Point3 { x: 0.0, y: 0.0, z: 0.0 },
+                end: umlcad_v6_sweep_api::Point3 { x: 3.0, y: 4.0, z: 12.0 },
+            },
+        };
+        let first = b.sweep_linear_circular(definition, T).unwrap();
+        let second = b.sweep_linear_circular(definition, T).unwrap();
+        assert_eq!(first.kind, second.kind);
+        assert_eq!(b.topology_counts(&first.shape, T).unwrap(), b.topology_counts(&second.shape, T).unwrap());
+        let a = b.bounding_box(&first.shape, T).unwrap();
+        let c = b.bounding_box(&second.shape, T).unwrap();
+        assert_eq!(a, c);
+        assert_eq!(definition.path.start, umlcad_v6_sweep_api::Point3 { x: 0.0, y: 0.0, z: 0.0 });
     }
 }
