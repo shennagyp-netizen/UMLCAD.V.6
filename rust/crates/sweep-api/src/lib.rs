@@ -61,10 +61,10 @@ pub struct LinearCircularSweep {
 impl LinearCircularSweep {
     pub fn validate(self, tolerance: ToleranceContext) -> Result<(), GeometryError> {
         tolerance.validate()?;
-        if !self.profile.center.finite() || !self.profile.normal.finite() || !self.path.start.finite() || !self.path.end.finite() {
+        if !self.profile.center.finite() || !self.profile.normal.finite() || !self.path.start.finite() || !self.path.end.finite() || !self.profile.radius.is_finite() {
             return Err(GeometryError::InvalidInput("sweep contains non-finite geometry"));
         }
-        if !self.profile.radius.is_finite() || self.profile.radius <= tolerance.modeling {
+        if self.profile.radius <= tolerance.modeling {
             return Err(GeometryError::InvalidInput("sweep profile radius must exceed modeling tolerance"));
         }
         let path = self.path.end.sub(self.path.start);
@@ -119,11 +119,7 @@ impl LinearCircularSweep {
 }
 
 pub trait SweepBackend: GeometryBackend {
-    fn sweep_linear_circular(
-        &self,
-        definition: LinearCircularSweep,
-        tolerance: ToleranceContext,
-    ) -> Result<GeometryResult<Self::Shape>, GeometryError>;
+    fn sweep_linear_circular(&self, definition: LinearCircularSweep, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError>;
 }
 
 #[cfg(test)]
