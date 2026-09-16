@@ -74,19 +74,29 @@ See `docs/S13_OFFSET_HEALING_CONTRACT.md`.
 
 ## Current station
 
-### S14 — Freeform feature generation — NEXT
+### S14 — Freeform feature generation — IN PROGRESS
 
-S14 is now the active development station. Its purpose is to extend the validated freeform construction layer into feature-generation operations while preserving the V6 authority order: mathematical semantics → backend-neutral contract → native realization → independent conformance → topology evidence.
+S14 extends the validated freeform construction layer into feature-generation operations while preserving the V6 authority order: mathematical semantics → backend-neutral contract → native realization → independent conformance → topology evidence.
 
-Initial S14 work should be partitioned into independently certifiable contracts rather than implemented as one broad feature bundle. Priority work is:
+The first active S14 slice is the independently certifiable `LinearCircularSweep` contract defined in `docs/S14_SWEEP_PIPE_CONTRACT.md`.
 
-1. robust sweep/pipe semantics and a bounded native realization;
+Current S14 slice:
+
+1. Exact circular-profile sweep along a finite straight path.
+2. Profile-plane/path perpendicularity and profile-center/path-start compatibility validation.
+3. Exact length and analytic volume semantics.
+4. Native OCCT realization behind a narrow backend contract.
+5. Deterministic topology, validity, bounding-box, and source-immutability checks.
+
+Following S14 slices remain separate gates:
+
+1. general multi-segment sweep/pipe paths with explicit orientation transport;
 2. variable-radius sweep semantics with explicit admissibility and failure classification;
 3. blend/fillet extensions beyond the current bounded family, with topology-change evidence;
 4. shell/thickness semantics and explicit thin/degenerate failure cases;
 5. drafted-surface construction semantics and conformance.
 
-The station must not promote OCCT-generated topology to authority merely because OCCT accepts the construction. Each new operation requires an independent semantic contract and adversarial/deterministic tests before native breadth is expanded.
+S14 does not promote OCCT-generated topology to authority merely because OCCT accepts a construction. Each new operation requires an independent semantic contract and adversarial/deterministic tests before native breadth is expanded.
 
 ## Following stations
 
