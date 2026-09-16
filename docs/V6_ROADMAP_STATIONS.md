@@ -99,14 +99,17 @@ Current S12 implementation checkpoint:
 - exact degree-1, two-control-point, unit-weight NURBS curves reuse the established planar line/surface semantic authority, including explicit coplanar/underdetermined handling and mapping back to the curve's actual parameter domain;
 - planar affine 2x2 NURBS surface/surface intersection has an independent exact plane-plane oracle, bounded UV-domain clipping, explicit distinction between parallel-disjoint and coincident/underdetermined cases, OCCT `GeomAPI_IntSS` realization, and native intersection-endpoint conformance;
 - planar affine 2x2 NURBS point/surface closest-point and distance semantics have an independent bounded-parallelogram oracle and OCCT `GeomAPI_ProjectPointOnSurf` conformance;
-- a certified plane-vs-NURBS relation primitive now uses control-net half-space evidence: strict one-sided control points certify disjointness, all control points within tolerance certify coplanarity within tolerance, and mixed-sign control nets remain explicitly `Undetermined` rather than being converted into an unproven intersection claim;
-- the certified plane-vs-NURBS relation exposes an explicit typed error contract for non-finite inputs, invalid surfaces, degenerate planes, and numerical failure;
+- a certified plane-vs-NURBS relation primitive uses control-net half-space evidence: strict one-sided control points certify disjointness, all control points within tolerance certify coplanarity within tolerance, and mixed-sign control nets remain explicitly `Undetermined` rather than being converted into an unproven intersection claim;
+- a general NURBS surface-pair broad-phase relation uses the positive-weight control-net convex-hull property: separated control-net AABBs certify disjointness, while overlapping bounds are only `PotentialContact`;
+- `intersect_nurbs_surfaces` now consumes that certified broad phase first: any pair proven disjoint returns a deterministic `NoIntersection` result even when the surfaces are outside the exact planar solver family; potential-contact pairs are delegated only to the already-proven planar solver and otherwise fail closed as `UnsupportedSurfaceFamily`;
+- the general dispatcher has an explicit typed tolerance/error mapping and deterministic unit coverage for separated quadratic NURBS surfaces, unsupported potential contact, and invalid tolerance;
 - arbitrary NURBS parameter intervals are handled explicitly by normalized semantic coordinates rather than assuming `[0,1]` domains;
 - native OCCT remains opaque to the semantic crates;
 - the semantic/root solvers remain the authority: native OCCT results are checked against independently computed expectations rather than defining semantics from the backend;
-- the current surface/surface semantic implementation is intentionally restricted to exact affine planar patches and is not yet a general NURBS surface/surface root solver or intersection-curve generator;
+- the current surface/surface semantic implementation is intentionally restricted to exact affine planar patches for actual intersection-curve construction and is not yet a general NURBS surface/surface root solver or intersection-curve generator;
 - generalized surface trimming from computed intersections remains outstanding, as does full topology evidence for generated intersection boundaries;
-- authoritative CI run #562 is fully green across workspace debug/release tests, Clippy, kernel format, kernel debug/release tests, and both kernel Clippy gates.
+- the new general-intersection boundary is documented separately in `docs/S12_SURFACE_INTERSECTION_CONTRACT.md`;
+- authoritative CI gates remain mandatory after every S12 increment; S12 is not complete until its full exit condition is satisfied.
 
 **S12 exit condition:** representative curve-surface and surface-surface operations are independently defined, numerically validated, natively realized, deterministic, and proven not to silently convert ambiguous geometric relations into arbitrary topology.
 
