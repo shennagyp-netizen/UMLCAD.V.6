@@ -28,6 +28,8 @@ The OCCT backend realizes:
 
 The source definition is immutable and the native result is a new shape.
 
+For native bounding-box conformance, the semantic expected geometry remains authoritative. The current OCCT 7.6.3 reference path has a measured planar-surface envelope on the order of `1e-7`; the backend conformance test therefore uses an explicit `1e-6` measurement envelope without changing the semantic/modeling tolerance.
+
 ## Explicit S13 boundary
 
 S13 does not yet claim arbitrary NURBS offsets, offset self-intersection resolution, corner joining, offset trimming, shell/thickness, or general imported-shape healing. These require separate mathematical and topological contracts and must not be approximated by sampling or by accepting a displayable OCCT result.
