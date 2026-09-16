@@ -20,8 +20,6 @@ Independent first/second differential mathematics, rational homogeneous-to-Eucli
 
 Backend-neutral trimmed NURBS surface definitions now validate UV-domain containment, loop closure/orientation, simplicity, holes, and loop intersections. OCCT creates native p-curves and 3D boundary curves behind the opaque boundary, with deterministic topology/area/validity tests. S11 passed its full authoritative CI gate.
 
-## Current station
-
 ### S12 — Surface-surface / curve-surface operations — COMPLETE
 
 S12 establishes the representative geometric operations needed to derive and modify freeform boundaries without promoting numerical guesses into topology.
@@ -45,24 +43,52 @@ S12 scope boundary:
 
 - The implemented exact surface/surface intersection curve construction is intentionally limited to the affine-planar patch family.
 - The general surface-pair dispatcher can certify disjointness for arbitrary valid positive-weight NURBS surfaces, but it does not claim exhaustive arbitrary NURBS/NURBS intersection-curve isolation.
-- General potential contact outside the proven solver families remains explicitly unsupported rather than approximated.
+- General potential contact outside the proven solver families remains explicitly unsupported.
 - General freeform intersection-curve tracing and generalized trimming remain later kernel work; no renderer approximation is promoted into topology.
 
 **S12 exit gate:** satisfied by the authoritative full CI matrix on PR #44: workspace debug/release tests, format, Clippy, kernel format/tests, and kernel Clippy gates all green, with semantic/native conformance tests passing.
 
-### S13 — Offsets and healing — IN PROGRESS
+### S13 — Offsets and healing — COMPLETE
 
-The first bounded S13 slice establishes exact backend-neutral offsets for oriented planar line segments and planar rectangular surface patches, with OCCT realization and independent conformance tests. General NURBS offsets, self-intersection/trimming, corner joining, shell/thickness, and generic healing remain explicitly unimplemented.
+S13 established the first bounded offset/healing slice without widening the semantic boundary.
 
-The healing contract requires explicit defect classes, permitted changes, tolerance budget, invariants, repair evidence, and failure/unsupported outcomes. A generic backend `make valid` result is not accepted as UMLCAD healing authority.
+Completed capabilities:
+
+1. Exact backend-neutral signed offset mathematics for oriented planar line segments.
+2. Exact backend-neutral oriented-normal offset mathematics for planar rectangular surface patches.
+3. Validation-before-native-construction for finite values, non-degenerate geometry, valid plane orientation, unit/orthogonal surface directions, finite distances, and finite results.
+4. Immutable native OCCT realization for both offset families behind the backend-neutral `OffsetBackend` contract.
+5. Independent semantic/unit coverage for positive, negative, and zero offsets plus adversarial invalid/non-finite cases.
+6. Native OCCT conformance coverage for line geometry, surface topology, and measured bounding-envelope behavior.
+7. Explicit 1e-6 OCCT surface BBox measurement envelope where native reporting exhibited sub-micro-unit numerical variation; semantic/modeling tolerances remain authoritative.
+8. Controlled-healing boundary documented with explicit defect classes, permitted changes, tolerance budget, invariants, repair evidence, and fail/unsupported outcomes; generic backend `make valid` is not accepted as UMLCAD healing authority.
+9. Full authoritative CI validation: workspace format, debug/release tests, workspace Clippy, kernel format, kernel debug/release tests, and kernel Clippy source/test gates all green on the S13 branch head.
+
+S13 scope boundary:
+
+- General arbitrary-NURBS offset construction is not claimed.
+- Self-intersection resolution, offset trimming/corner joining, shell/thickness, and generalized imported-shape healing are not claimed by this station.
+- Unsupported cases remain explicitly unsupported rather than approximated or silently healed.
 
 See `docs/S13_OFFSET_HEALING_CONTRACT.md`.
 
+## Current station
+
+### S14 — Freeform feature generation — NEXT
+
+S14 is now the active development station. Its purpose is to extend the validated freeform construction layer into feature-generation operations while preserving the V6 authority order: mathematical semantics → backend-neutral contract → native realization → independent conformance → topology evidence.
+
+Initial S14 work should be partitioned into independently certifiable contracts rather than implemented as one broad feature bundle. Priority work is:
+
+1. robust sweep/pipe semantics and a bounded native realization;
+2. variable-radius sweep semantics with explicit admissibility and failure classification;
+3. blend/fillet extensions beyond the current bounded family, with topology-change evidence;
+4. shell/thickness semantics and explicit thin/degenerate failure cases;
+5. drafted-surface construction semantics and conformance.
+
+The station must not promote OCCT-generated topology to authority merely because OCCT accepts the construction. Each new operation requires an independent semantic contract and adversarial/deterministic tests before native breadth is expanded.
+
 ## Following stations
-
-### S14 — Freeform feature generation
-
-Extend robust sweep/pipe, variable-radius sweep, blend/fillet extensions, shell/thickness, drafted surfaces, and related freeform construction primitives.
 
 ### S15 — Robust B-Rep topology kernel completion
 
