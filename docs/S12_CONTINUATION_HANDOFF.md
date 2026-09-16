@@ -2,9 +2,11 @@
 
 ## Station status
 
-S12 is the active station until its exit gate is satisfied and merged to `main`.
+**S12 is COMPLETE and merged to `main`.**
 
-The branch is `v6-s12-curve-surface-operations` and the work is carried by PR #44.
+PR #44 (`v6-s12-curve-surface-operations`) was merged by squash after the final authoritative CI gate passed. Merge commit: `4277cf40e1923484b2faa87638b348ff8b94389a`.
+
+The final authoritative CI run for the pre-merge head was fully green across workspace debug/release tests, format, Clippy, kernel format/tests, and both kernel Clippy gates.
 
 ## Completed S12 semantic capabilities
 
@@ -18,25 +20,23 @@ The branch is `v6-s12-curve-surface-operations` and the work is carried by PR #4
 - general surface-pair dispatcher that returns deterministic `NoIntersection` when disjointness is certified and otherwise delegates only to a proven solver family;
 - opaque OCCT realizations with semantic-first conformance against independently computed expectations.
 
-## S12 completion gate
+## S12 scope boundary
 
-S12 may be marked complete only when the following are all true:
+S12 does not claim an exhaustive arbitrary NURBS/NURBS intersection-curve solver. General potential contact outside the proven solver families remains explicitly unsupported. General freeform intersection tracing and generalized trimming remain later kernel work; no renderer approximation or ambiguous numerical trace is promoted into topology.
 
-1. representative curve/surface and surface/surface operations have independent semantic definitions;
-2. invalid, degenerate, tangent, coincident, ambiguous, and unsupported cases have explicit outcomes;
-3. numerical tests cover non-unit parameter domains and deterministic ordering;
-4. OCCT realization is validated against the semantic authority rather than defining it;
-5. intersection-driven operations do not create arbitrary topology from unverified numerical traces;
-6. authoritative CI is fully green, including debug/release workspace tests, Clippy, kernel format/tests, and kernel Clippy gates;
-7. PR #44 is merged to `main` without bypassing the CI gate.
+## Verified completion gate
 
-## Scope boundary
-
-The branch must not claim a generic exhaustive NURBS/NURBS intersection-curve solver merely because a broad-phase or numerical seed solver exists. General potential contact outside the proven solver families remains explicitly unsupported until an independently validated continuation/curve-isolation method is added.
+1. Representative curve/surface and surface/surface operations have independent semantic definitions.
+2. Invalid, degenerate, tangent, coincident, ambiguous, and unsupported cases have explicit outcomes in the supported families.
+3. Tests cover non-unit parameter domains and deterministic result ordering.
+4. OCCT realization is validated against the semantic authority rather than defining it.
+5. Intersection-driven operations do not promote unverified numerical traces into topology.
+6. The authoritative full CI matrix passed.
+7. PR #44 is closed and merged to `main`.
 
 ## Post-S12 continuation
 
-After merge, create the next station from `main` rather than continuing to accumulate S12 work on the merged branch:
+The next station starts from the merged `main` branch:
 
 - **S13:** offsets and healing with explicit repair authority and failure semantics;
 - **S14:** freeform feature generation extensions;
@@ -45,7 +45,7 @@ After merge, create the next station from `main` rather than continuing to accum
 - **S17:** performance and stress validation;
 - **S18:** V6 part-geometry-kernel completion gate.
 
-The next implementation should preserve the invariant:
+Preserve the invariant:
 
 ```text
 semantic mathematics -> backend-neutral contract -> opaque native realization -> independent conformance -> topology
