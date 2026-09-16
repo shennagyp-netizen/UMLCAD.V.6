@@ -23,30 +23,11 @@ unsafe extern "C" {
 }
 
 impl OffsetBackend for OcctBackend {
-    fn offset_planar_line(
-        &self,
-        definition: PlanarLineSegment3D,
-        distance: f64,
-        tolerance: ToleranceContext,
-    ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
+    fn offset_planar_line(&self, definition: PlanarLineSegment3D, distance: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError> {
         let result = definition.offset(distance, tolerance)?;
-        self.line_curve(
-            result.start.x,
-            result.start.y,
-            result.start.z,
-            result.end.x,
-            result.end.y,
-            result.end.z,
-            tolerance,
-        )
+        self.line_curve(result.start.x, result.start.y, result.start.z, result.end.x, result.end.y, result.end.z, tolerance)
     }
-
-    fn offset_planar_surface(
-        &self,
-        definition: PlanarSurfacePatch3D,
-        distance: f64,
-        tolerance: ToleranceContext,
-    ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
+    fn offset_planar_surface(&self, definition: PlanarSurfacePatch3D, distance: f64, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError> {
         let result = definition.offset(distance, tolerance)?;
         let u = result.u_dir.scale(result.width);
         let v = result.v_dir.scale(result.height);
@@ -72,25 +53,15 @@ impl OffsetBackend for OcctBackend {
 }
 
 impl SweepBackend for OcctBackend {
-    fn sweep_linear_circular(
-        &self,
-        definition: LinearCircularSweep,
-        tolerance: ToleranceContext,
-    ) -> Result<GeometryResult<Self::Shape>, GeometryError> {
+    fn sweep_linear_circular(&self, definition: LinearCircularSweep, tolerance: ToleranceContext) -> Result<GeometryResult<Self::Shape>, GeometryError> {
         definition.validate(tolerance)?;
         let mut raw = std::ptr::null_mut();
         let status = unsafe {
             umlcad_occt_sweep_linear_circular(
-                definition.path.start.x,
-                definition.path.start.y,
-                definition.path.start.z,
-                definition.path.end.x,
-                definition.path.end.y,
-                definition.path.end.z,
+                definition.path.start.x, definition.path.start.y, definition.path.start.z,
+                definition.path.end.x, definition.path.end.y, definition.path.end.z,
                 definition.profile.radius,
-                definition.profile.normal.x,
-                definition.profile.normal.y,
-                definition.profile.normal.z,
+                definition.profile.normal.x, definition.profile.normal.y, definition.profile.normal.z,
                 &mut raw,
             )
         };
@@ -111,10 +82,7 @@ mod tests {
     use super::*;
     use umlcad_v6_geometry_api::{GeometryBackend, GeometryKind};
 
-    const T: ToleranceContext = ToleranceContext {
-        modeling: 1e-9,
-        validation: 1e-9,
-    };
+    const T: ToleranceContext = ToleranceContext { modeling: 1e-9, validation: 1e-9 };
     const OCCT_PLANAR_SURFACE_BOUND_TOLERANCE: f64 = 1e-6;
 
     #[test]
@@ -138,8 +106,7 @@ mod tests {
             origin: umlcad_v6_offset_api::Point3 { x: 1.0, y: 2.0, z: 3.0 },
             u_dir: umlcad_v6_offset_api::Point3 { x: 1.0, y: 0.0, z: 0.0 },
             v_dir: umlcad_v6_offset_api::Point3 { x: 0.0, y: 1.0, z: 0.0 },
-            width: 5.0,
-            height: 8.0,
+            width: 5.0, height: 8.0,
         };
         let result = b.offset_planar_surface(source, 4.0, T).unwrap();
         let counts = b.topology_counts(&result.shape, T).unwrap();
@@ -163,10 +130,7 @@ mod tests {
             end: umlcad_v6_offset_api::Point3 { x: 0.0, y: 0.0, z: 0.0 },
             plane_normal: umlcad_v6_offset_api::Point3 { x: 0.0, y: 0.0, z: 1.0 },
         };
-        assert!(matches!(
-            b.offset_planar_line(source, 1.0, T),
-            Err(GeometryError::InvalidInput("planar line offset requires a non-degenerate segment"))
-        ));
+        assert!(matches!(b.offset_planar_line(source, 1.0, T), Err(GeometryError::InvalidInput("planar line offset requires a non-degenerate segment"))));
     }
 
     #[test]
@@ -185,8 +149,9 @@ mod tests {
         };
         let result = b.sweep_linear_circular(definition, T).unwrap();
         assert_eq!(result.kind, GeometryKind::Solid);
-        assert_eq!(b.validate(&result.shape, T).unwrap().valid, true);
-        assert_eq!(b.validate(&result.shape, T).unwrap().manifold, true);
+        let validation = b.validate(&result.shape, T).unwrap();
+        assert_eq!(validation.valid, true);
+        assert_eq!(validation.manifold, true);
         let bounds = b.bounding_box(&result.shape, T).unwrap();
         assert!((bounds.min_x - 3.0).abs() <= 1e-9);
         assert!((bounds.max_x - 7.0).abs() <= 1e-9);
@@ -200,10 +165,11 @@ mod tests {
     #[test]
     fn linear_circular_sweep_supports_arbitrary_path_orientation() {
         let b = OcctBackend::new();
+        let direction = (89.0f64).sqrt();
         let definition = LinearCircularSweep {
             profile: umlcad_v6_sweep_api::CircularProfile {
                 center: umlcad_v6_sweep_api::Point3 { x: 1.0, y: 2.0, z: 3.0 },
-                normal: umlcad_v6_sweep_api::Point3 { x: 0.0, y: 0.8, z: -0.6 },
+                normal: umlcad_v6_sweep_api::Point3 { x: 5.0 / direction, y: 0.0, z: 8.0 / direction },
                 radius: 1.0,
             },
             path: umlcad_v6_sweep_api::LinearPath {
@@ -225,7 +191,7 @@ mod tests {
         let definition = LinearCircularSweep {
             profile: umlcad_v6_sweep_api::CircularProfile {
                 center: umlcad_v6_sweep_api::Point3 { x: 0.0, y: 0.0, z: 0.0 },
-                normal: umlcad_v6_sweep_api::Point3 { x: 0.0, y: 0.0, z: 1.0 },
+                normal: umlcad_v6_sweep_api::Point3 { x: 3.0 / 13.0, y: 4.0 / 13.0, z: 12.0 / 13.0 },
                 radius: 1.5,
             },
             path: umlcad_v6_sweep_api::LinearPath {
